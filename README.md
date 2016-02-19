@@ -4,6 +4,6 @@ Based around the tweet_dumper.py gist by Yanofsky (https://gist.github.com/yanof
 
 
 ## Requirements ##
-  Python 3
-  tweepy
-  appdirs (included as a private copy)
+  * Python 3
+  * tweepy
+  * appdirs (included as a private copy)
