@@ -13,17 +13,16 @@ except ImportError:
     import birdbody.appdirs as appdirs
 
  
-def get_multi_user_tweets(data_path, consumer_key, consumer_secret, access_key, access_secret, screen_names, conn=None):
+def get_tweets_by_users(data_path, consumer_key, consumer_secret, access_key, access_secret, screen_names, conn=None):
     auth = tweepy.OAuthHandler(consumer_key, consumer_secret)
     auth.set_access_token(access_key, access_secret)
     api = tweepy.API(auth)
-
     for sn in screen_names:
         if conn:
             msg = "Getting tweets for {} ...".format(sn)
             conn.send(msg)
         print(sn)
-        user_tweets = get_user_tweets(api, sn, conn)
+        user_tweets = tweets_for_screen_name(api, sn, conn)
         user_tweets_to_csv(data_path, user_tweets, sn, conn)
         msg = "Done with {}!".format(sn)
         if conn:
@@ -31,7 +30,7 @@ def get_multi_user_tweets(data_path, consumer_key, consumer_secret, access_key, 
         else:
             print(msg) 
 
-def get_user_tweets(api, screen_name, conn=None):
+def tweets_for_screen_name(api, screen_name, conn=None):
     #Twitter only allows access to a users most recent 3240 tweets with this method
     #initialize a list to hold all the tweepy Tweets
     user_tweets = []  
@@ -64,21 +63,37 @@ def get_user_tweets(api, screen_name, conn=None):
                 print(msg)
     return user_tweets
     
-def user_tweets_to_csv(data_path, user_tweets, screen_name, conn=None):    
-    #transform the tweepy tweets into a 2D array that will populate the csv 
-    outtweets = [[tweet.id_str, tweet.created_at, tweet.text] for tweet in user_tweets]
-    #write the csv
-    dn = os.path.join(data_path, "tweets")
+def user_tweets_to_csv(data_path, user_tweets, screen_name, conn=None, add_date_to_fn=True):    
+    today = datetime.datetime.now().date()
+    fields = ["TWEET_ID", "CREATED", "TEXT", "LANGUAGE", "SCREEN_NAME", "LOCATION", "VERIFIED",
+              "ACCOUNT_CREATED", "COLLECTED"]
+    tweet_dict_list = []
+    for tweet in user_tweets:
+        t = {}
+        t["TWEET_ID"] = tweet.id_str
+        t["CREATED"] = tweet.created_at 
+        t["TEXT"] = tweet.text
+        t["LANGUAGE"] = tweet.lang
+        t["SCREEN_NAME"] = tweet.user.screen_name
+        t["LOCATION"] = tweet.user.location
+        t["VERIFIED"] = tweet.user.verified
+        t["ACCOUNT_CREATED"] = tweet.user.created_at
+        t["COLLECTED"] = today
+        tweet_dict_list.append(t)
+    dn = os.path.join(data_path, "tweets", "csv")
     try:
         os.makedirs(dn)
     except OSError as e:
         if e.errno != 17:
             raise()
-    fp = os.path.join(dn, "{}_tweets.csv".format(screen_name))  
-    with open(fp, 'w', newline='', encoding='utf8') as f:
-        writer = csv.writer(f)
-        writer.writerow(["TWEET_ID", "CREATED_AT", "TEXT"])
-        writer.writerows(outtweets)
+    if not add_date_to_fn:
+        fp = os.path.join(dn, "{}_tweets.csv".format(screen_name))  
+    else:
+        fp = os.path.join(dn, "{}_{}_tweets.csv".format(screen_name, today))
+    with open(fp, 'w', newline='', encoding='utf8') as handler:
+        writer = csv.DictWriter(handler, fieldnames=fields, dialect="excel")
+        writer.writeheader()
+        writer.writerows(tweet_dict_list)
         msg = "Saved tweets to {}.".format(fp)
         if conn:
             conn.send(msg)
@@ -119,15 +134,13 @@ class BirdbodyGUI(tk.Frame):
         self.book = ttk.Notebook(self)
         self.book.grid(column=0, row=0, sticky="news")
         # --- main --- #
-        self.main_frame = tk.Frame()
-        self.book.add(self.main_frame, text="Main")
         # --- settings --- #
         self.settings_frame = tk.Frame()
-        self.book.add(self.settings_frame, text="User settings")
+        self.book.add(self.settings_frame, text="Settings")
         self.settings_frame.rowconfigure(0, weight=0)
         self.settings_frame.columnconfigure(0, weight=0)
         ttk.Label(self.settings_frame, text="Twitter API credentials",
-                  font="verdana 14").grid(row=0, column=0, columnspan=2, sticky="news")
+                  font="verdana 12").grid(row=0, column=0, columnspan=2, sticky="news")
         #Twitter API credentials
         self.consumer_key_var = tk.StringVar()
         self.consumer_secret_var = tk.StringVar()
@@ -180,34 +193,56 @@ class BirdbodyGUI(tk.Frame):
             except tk.TclError:
                 pass
 
-        # === Main === # 
-        self.main_frame.rowconfigure(0, weight=0)
-        self.main_frame.rowconfigure(1, weight=1)
-        self.main_frame.columnconfigure(0, weight=0)
-        self.main_frame.columnconfigure(1, weight=1)
-                
-        ttk.Label(self.main_frame, font="verdana 14",
+        # === user tweets === # 
+        self.user_tweets_frame = tk.Frame()
+        self.book.add(self.user_tweets_frame, text="Tweets by users")
+        self.user_tweets_frame.rowconfigure(0, weight=0)
+        self.user_tweets_frame.rowconfigure(1, weight=1)
+        self.user_tweets_frame.columnconfigure(0, weight=0)
+        self.user_tweets_frame.columnconfigure(1, weight=1)
+        self.ut_main_frame = tk.Frame(self.user_tweets_frame)
+        self.ut_main_frame.grid(row=0, column=0, sticky="news")
+        self.ut_main_frame.columnconfigure(0, weight=0)
+        self.ut_main_frame.columnconfigure(1, weight=0)
+        self.ut_log_frame = tk.Frame(self.user_tweets_frame)
+        self.ut_log_frame.grid(row=0, column=1, sticky="news")
+
+        # Main
+        ttk.Label(self.ut_main_frame, font="verdana 12",
                  text="Insert twitter screen names below (one per line)").grid(row=0, column=0, 
                                                                             sticky="news")
-        self.screen_names_text = tk.Text(self.main_frame)
-        self.screen_names_text.grid(row=1, column=0, sticky="news")
+        self.screen_names_text = tk.Text(self.ut_main_frame)
+        self.screen_names_text.grid(row=1, column=0, columnspan=2, sticky="news")
         
-        ttk.Label(self.main_frame,
-                 text="Data log").grid(row=0, column=1, sticky="news")
-        self.log_text = tk.Text(self.main_frame)
-        self.log_text.grid(row=1, column=1, sticky="news")
-
-        self.download_button = tk.Button(self.main_frame,
+        
+        self.ut_download_button = tk.Button(self.ut_main_frame,
                                          text="Download tweets", 
-                                         command=self.download_tweets)
+                                         command=self.ut_download_tweets)
+        self.load_sn_button = tk.Button(self.ut_main_frame, text="Load list of names", command=self.load_screen_names)
+        self.save_sn_button = tk.Button(self.ut_main_frame, text="Save list of names", command=self.save_screen_names)
+        self.load_sn_button.grid(row=2, column=0, sticky="news")
+        self.save_sn_button.grid(row=2, column=1, sticky="news")
+        self.ut_download_button.grid(row=3, column=0, columnspan=2, sticky="news")
+        # Log
+        ttk.Label(self.ut_log_frame, text="Log", font="verdana 12").grid(row=0, column=1, sticky="news")
+        self.ut_log_text = tk.Text(self.ut_log_frame)
+        self.ut_log_text.grid(row=1, column=1, sticky="news")
 
-        for child in self.main_frame.winfo_children():
+
+
+
+        for child in self.user_tweets_frame.winfo_children():
             try:
                 child.grid_configure(padx=5, pady=5)
             except tk.TclError:
                 pass
 
-    def download_tweets(self):
+    def save_screen_names(self):
+        pass
+    def load_screen_names(self):
+        pass
+
+    def ut_download_tweets(self):
         screen_names = []
         sn_text = self.screen_names_text.get("0.0", "end")
         if sn_text:
@@ -224,24 +259,24 @@ class BirdbodyGUI(tk.Frame):
             ak = self.access_key_var.get().strip()
             acs = self.access_secret_var.get().strip()
             #get_multi_user_tweets(udp, ck, cs, ak, acs, screen_names)
-            self.download_button.configure(text="Download tweets", state="disabled")
+            self.ut_download_button.configure(text="Download tweets", state="disabled")
             self.main_conn, worker_conn = mp.Pipe()
             # data_path, consumer_key, consumer_secret, access_key, access_secret
-            self.download_worker_proc = mp.Process(target=get_multi_user_tweets, args=(udp, ck, cs, ak, acs, screen_names,
+            self.ut_download_worker_proc = mp.Process(target=get_tweets_by_users, args=(udp, ck, cs, ak, acs, screen_names,
                                                                                               worker_conn))
-            self.download_worker_proc.start()
+            self.ut_download_worker_proc.start()
             self.root.update()
             self.root.after(250, self.check_download_status)
 
             #corpus.get_multi_user_tweets(screen_names)
             
     def check_download_status(self):
-        if not self.download_worker_proc.is_alive():
-            self.download_worker_proc.join()
+        if not self.ut_download_worker_proc.is_alive():
+            self.ut_download_worker_proc.join()
             msg = "Done downloading tweets for all users."
             self.update_status(msg, ts=True)
             self.write_to_log(msg, ts=True)
-            self.download_button.configure(text="Download tweets", state="normal")
+            self.ut_download_button.configure(text="Download tweets", state="normal")
             self.root.update_idletasks()
 
         else:
@@ -265,8 +300,8 @@ class BirdbodyGUI(tk.Frame):
         if ts:
             now = datetime.datetime.now().isoformat()[:19].replace("T"," ")
             text = "{} ({})".format(text, now)
-        self.log_text.insert("end", text)
-        self.log_text.insert("end", "\n")
+        self.ut_log_text.insert("end", text)
+        self.ut_log_text.insert("end", "\n")
 
     def save_data_path(self):
         udp = self.data_path_var.get().strip()
