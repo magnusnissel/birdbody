@@ -1,5 +1,6 @@
 import tkinter as tk
-from bbcore import BirdbodyGUI
+import multiprocessing as mp
+from birdbody.bbcore import BirdbodyGUI
 
 
 def main():
@@ -7,4 +8,5 @@ def main():
     BirdbodyGUI(root)
 
 if __name__ == '__main__':
+    mp.freeze_support()
     main()

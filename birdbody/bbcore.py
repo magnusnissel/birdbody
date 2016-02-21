@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 import os
 import datetime
 import tkinter as tk
@@ -8,92 +7,83 @@ import tkinter.filedialog
 import tweepy
 import csv
 import configparser
-import appdirs
+try:
+    import appdirs
+except ImportError:
+    import birdbody.appdirs as appdirs
 
+ 
+def get_multi_user_tweets(data_path, consumer_key, consumer_secret, access_key, access_secret, screen_names, conn=None):
+    auth = tweepy.OAuthHandler(consumer_key, consumer_secret)
+    auth.set_access_token(access_key, access_secret)
+    api = tweepy.API(auth)
 
-class TwitterCorpus():
-
-    def __init__(self, data_path, consumer_key, consumer_secret, access_key, access_secret):
-        self.data_path = data_path
-        self.consumer_key = consumer_key
-        self.consumer_secret = consumer_secret
-        self.access_key = access_key
-        self.access_secret = access_secret
-        self.authenticate()
-
-    def authenticate(self):
-        #authorize twitter, initialize tweepy
-        auth = tweepy.OAuthHandler(self.consumer_key, self.consumer_secret)
-        auth.set_access_token(self.access_key, self.access_secret)
-        self.api = tweepy.API(auth)
-
-    def get_multi_user_tweets(self, screen_names, conn=None):
-        for sn in screen_names:
-            if conn:
-                msg = "Getting tweets for {} ...".format(sn)
-                conn.send(msg)
-
-            user_tweets = self.get_user_tweets(sn, conn)
-            self.user_tweets_to_csv(user_tweets, sn, conn)
-            msg = "Done with {}!".format(sn)
-            if conn:
-                conn.send(msg)
-            else:
-                print(msg) 
-
-    def get_user_tweets(self, screen_name, conn=None):
-        #Twitter only allows access to a users most recent 3240 tweets with this method
-        #initialize a list to hold all the tweepy Tweets
-        user_tweets = []  
-        #make initial request for most recent tweets (200 is the maximum allowed count)
-        try:
-            new_tweets = self.api.user_timeline(screen_name = screen_name, count=200)
-        except tweepy.error.TweepError as e:
-            if conn:
-                conn.send(e)
-            else:
-                print(e)
+    for sn in screen_names:
+        if conn:
+            msg = "Getting tweets for {} ...".format(sn)
+            conn.send(msg)
+        print(sn)
+        user_tweets = get_user_tweets(api, sn, conn)
+        user_tweets_to_csv(data_path, user_tweets, sn, conn)
+        msg = "Done with {}!".format(sn)
+        if conn:
+            conn.send(msg)
         else:
+            print(msg) 
+
+def get_user_tweets(api, screen_name, conn=None):
+    #Twitter only allows access to a users most recent 3240 tweets with this method
+    #initialize a list to hold all the tweepy Tweets
+    user_tweets = []  
+    #make initial request for most recent tweets (200 is the maximum allowed count)
+    try:
+        new_tweets = api.user_timeline(screen_name = screen_name, count=200)
+    except tweepy.error.TweepError as e:
+        if conn:
+            conn.send(e)
+        else:
+            print(e)
+    else:
+        #save most recent tweets
+        user_tweets.extend(new_tweets)
+        #save the id of the oldest tweet less one
+        oldest = user_tweets[-1].id - 1
+        #keep grabbing tweets until there are no tweets left to grab
+        while len(new_tweets) > 0:
+            #all subsequent requests use the max_id parameter to prevent duplicates
+            new_tweets = api.user_timeline(screen_name = screen_name,count=200,
+                                                max_id=oldest)
             #save most recent tweets
             user_tweets.extend(new_tweets)
-            #save the id of the oldest tweet less one
+            #update the id of the oldest tweet less one
             oldest = user_tweets[-1].id - 1
-            #keep grabbing tweets until there are no tweets left to grab
-            while len(new_tweets) > 0:
-                #all subsequent requests use the max_id parameter to prevent duplicates
-                new_tweets = self.api.user_timeline(screen_name = screen_name,count=200,
-                                                    max_id=oldest)
-                #save most recent tweets
-                user_tweets.extend(new_tweets)
-                #update the id of the oldest tweet less one
-                oldest = user_tweets[-1].id - 1
-                msg = "{} tweets downloaded for {} so far.".format(len(user_tweets), screen_name)
-                if conn:
-                    conn.send(msg)
-                else:
-                    print(msg)
-        return user_tweets
-        
-    def user_tweets_to_csv(self, user_tweets, screen_name, conn=None):    
-        #transform the tweepy tweets into a 2D array that will populate the csv 
-        outtweets = [[tweet.id_str, tweet.created_at, tweet.text] for tweet in user_tweets]
-        #write the csv
-        dn = os.path.join(self.data_path, "tweets")
-        try:
-            os.makedirs(dn)
-        except OSError as e:
-            if e.errno != 17:
-                raise()
-        fp = os.path.join(dn, "{}_tweets.csv".format(screen_name))  
-        with open(fp, 'w') as f:
-            writer = csv.writer(f)
-            writer.writerow(["TWEET_ID", "CREATED_AT", "TEXT"])
-            writer.writerows(outtweets)
-            msg = "Saved tweets to {}.".format(fp)
+            msg = "{} tweets downloaded for {} so far.".format(len(user_tweets), screen_name)
             if conn:
                 conn.send(msg)
             else:
                 print(msg)
+    return user_tweets
+    
+def user_tweets_to_csv(data_path, user_tweets, screen_name, conn=None):    
+    #transform the tweepy tweets into a 2D array that will populate the csv 
+    outtweets = [[tweet.id_str, tweet.created_at, tweet.text] for tweet in user_tweets]
+    #write the csv
+    dn = os.path.join(data_path, "tweets")
+    try:
+        os.makedirs(dn)
+    except OSError as e:
+        if e.errno != 17:
+            raise()
+    fp = os.path.join(dn, "{}_tweets.csv".format(screen_name))  
+    with open(fp, 'w', newline='', encoding='utf8') as f:
+        writer = csv.writer(f)
+        writer.writerow(["TWEET_ID", "CREATED_AT", "TEXT"])
+        writer.writerows(outtweets)
+        msg = "Saved tweets to {}.".format(fp)
+        if conn:
+            conn.send(msg)
+        else:
+            print(msg)
 
 
 class BirdbodyGUI(tk.Frame):
@@ -233,17 +223,18 @@ class BirdbodyGUI(tk.Frame):
             cs = self.consumer_secret_var.get().strip()
             ak = self.access_key_var.get().strip()
             acs = self.access_secret_var.get().strip()
-            corpus = TwitterCorpus(udp, ck, cs, ak, acs)
+            #get_multi_user_tweets(udp, ck, cs, ak, acs, screen_names)
             self.download_button.configure(text="Download tweets", state="disabled")
             self.main_conn, worker_conn = mp.Pipe()
-            self.download_worker_proc = mp.Process(target=corpus.get_multi_user_tweets, args=(screen_names,
+            # data_path, consumer_key, consumer_secret, access_key, access_secret
+            self.download_worker_proc = mp.Process(target=get_multi_user_tweets, args=(udp, ck, cs, ak, acs, screen_names,
                                                                                               worker_conn))
             self.download_worker_proc.start()
             self.root.update()
             self.root.after(250, self.check_download_status)
 
             #corpus.get_multi_user_tweets(screen_names)
-
+            
     def check_download_status(self):
         if not self.download_worker_proc.is_alive():
             self.download_worker_proc.join()
@@ -361,3 +352,5 @@ class BirdbodyGUI(tk.Frame):
             geom_string = "{}x{}+0+0".format(w, h)
             toplevel.wm_geometry(geom_string)
 
+if __name__ == "__main__":
+    mp.freeze_support()

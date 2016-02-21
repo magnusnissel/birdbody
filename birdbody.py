@@ -5,7 +5,9 @@ absolute imports don't work (if package not installed) or use the old installed 
 the package
 """
 
-from birdbody import __main__
+from multiprocessing import freeze_support
+from birdbody import bbstart
 
 if __name__ == "__main__":
-	__main__.main()
+        freeze_support()
+        bbstart.main()

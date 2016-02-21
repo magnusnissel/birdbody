@@ -11,7 +11,7 @@ setup(name='birdbody',
       install_requires=["tweepy"],
       entry_points={
                 'gui_scripts': [
-                    'birdbody = birdbody.__main__:main'
+                    'birdbody = birdbody.bbstart:main'
                 ]
             },
       zip_safe=False,
