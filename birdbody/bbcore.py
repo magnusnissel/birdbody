@@ -11,6 +11,11 @@ try:
     import appdirs
 except ImportError:
     import birdbody.appdirs as appdirs
+HAS_PANDAS = True
+try:
+    import pandas as pd
+except ImportError:
+    HAS_PANDAS = False
 
  
 def get_tweets_by_users(data_path, consumer_key, consumer_secret, access_key, access_secret, screen_names, conn=None):
@@ -21,9 +26,11 @@ def get_tweets_by_users(data_path, consumer_key, consumer_secret, access_key, ac
         if conn:
             msg = "Getting tweets for {} ...".format(sn)
             conn.send(msg)
-        print(sn)
         user_tweets = tweets_for_screen_name(api, sn, conn)
-        user_tweets_to_csv(data_path, user_tweets, sn, conn)
+        if HAS_PANDAS:
+            pd_user_tweets_to_csv(data_path, user_tweets, sn, conn)
+        else:
+            user_tweets_to_csv(data_path, user_tweets, sn, conn)
         msg = "Done with {}!".format(sn)
         if conn:
             conn.send(msg)
@@ -63,24 +70,34 @@ def tweets_for_screen_name(api, screen_name, conn=None):
                 print(msg)
     return user_tweets
     
-def user_tweets_to_csv(data_path, user_tweets, screen_name, conn=None, add_date_to_fn=True):    
+    
+
+def tweets_to_dict_list(tweets):
     today = datetime.datetime.now().date()
-    fields = ["TWEET_ID", "CREATED", "TEXT", "LANGUAGE", "SCREEN_NAME", "LOCATION", "VERIFIED",
-              "ACCOUNT_CREATED", "COLLECTED"]
     tweet_dict_list = []
-    for tweet in user_tweets:
+    for tweet in tweets:
         t = {}
         t["TWEET_ID"] = tweet.id_str
         t["CREATED"] = tweet.created_at 
         t["TEXT"] = tweet.text
+        if tweet.in_reply_to_user_id:
+            t["IS_REPLY"] = True
+        else:
+            t["IS_REPLY"] = False
         t["LANGUAGE"] = tweet.lang
         t["SCREEN_NAME"] = tweet.user.screen_name
+        t["NAME"] = tweet.user.name
         t["LOCATION"] = tweet.user.location
         t["VERIFIED"] = tweet.user.verified
         t["ACCOUNT_CREATED"] = tweet.user.created_at
         t["COLLECTED"] = today
         tweet_dict_list.append(t)
+    return tweet_dict_list
+
+def pd_user_tweets_to_csv(data_path, tweets, screen_name, conn=None, add_date_to_fn=True):
+    tweet_dict_list = tweets_to_dict_list(tweets)
     dn = os.path.join(data_path, "tweets", "csv")
+    df = pd.DataFrame.from_dict(tweet_dict_list)
     try:
         os.makedirs(dn)
     except OSError as e:
@@ -89,16 +106,36 @@ def user_tweets_to_csv(data_path, user_tweets, screen_name, conn=None, add_date_
     if not add_date_to_fn:
         fp = os.path.join(dn, "{}_tweets.csv".format(screen_name))  
     else:
+        today = datetime.datetime.now().date()
         fp = os.path.join(dn, "{}_{}_tweets.csv".format(screen_name, today))
-    with open(fp, 'w', newline='', encoding='utf8') as handler:
-        writer = csv.DictWriter(handler, fieldnames=fields, dialect="excel")
-        writer.writeheader()
-        writer.writerows(tweet_dict_list)
-        msg = "Saved tweets to {}.".format(fp)
-        if conn:
-            conn.send(msg)
+    if len(df.index) > 0:
+        df.to_csv(fp)
+
+def user_tweets_to_csv(data_path, tweets, screen_name, conn=None, add_date_to_fn=True):    
+    fields = ["TWEET_ID", "CREATED", "TEXT", "IS_REPLY", "LANGUAGE", "SCREEN_NAME", "NAME", "LOCATION", 
+              "VERIFIED", "ACCOUNT_CREATED", "COLLECTED"]
+    tweet_dict_list = tweets_to_dict_list(tweets)
+    if len(tweet_dict_list) > 0:
+        dn = os.path.join(data_path, "tweets", "csv")
+        try:
+            os.makedirs(dn)
+        except OSError as e:
+            if e.errno != 17:
+                raise()
+        if not add_date_to_fn:
+            fp = os.path.join(dn, "{}_tweets.csv".format(screen_name))  
         else:
-            print(msg)
+            fp = os.path.join(dn, "{}_{}_tweets.csv".format(screen_name, today))
+            today = datetime.datetime.now().date()
+        with open(fp, 'w', newline='', encoding='utf8') as handler:
+            writer = csv.DictWriter(handler, fieldnames=fields, dialect="excel")
+            writer.writeheader()
+            writer.writerows(tweet_dict_list)
+            msg = "Saved tweets to {}.".format(fp)
+            if conn:
+                conn.send(msg)
+            else:
+                print(msg)
 
 
 class BirdbodyGUI(tk.Frame):
@@ -133,10 +170,12 @@ class BirdbodyGUI(tk.Frame):
         # --- main notebook --- #
         self.book = ttk.Notebook(self)
         self.book.grid(column=0, row=0, sticky="news")
-        # --- main --- #
-        # --- settings --- #
+        self.user_tweets_frame = tk.Frame()
         self.settings_frame = tk.Frame()
+        self.book.add(self.user_tweets_frame, text="Tweets by users")
         self.book.add(self.settings_frame, text="Settings")
+        
+        # --- settings --- #
         self.settings_frame.rowconfigure(0, weight=0)
         self.settings_frame.columnconfigure(0, weight=0)
         ttk.Label(self.settings_frame, text="Twitter API credentials",
@@ -194,8 +233,6 @@ class BirdbodyGUI(tk.Frame):
                 pass
 
         # === user tweets === # 
-        self.user_tweets_frame = tk.Frame()
-        self.book.add(self.user_tweets_frame, text="Tweets by users")
         self.user_tweets_frame.rowconfigure(0, weight=0)
         self.user_tweets_frame.rowconfigure(1, weight=1)
         self.user_tweets_frame.columnconfigure(0, weight=0)
@@ -238,9 +275,40 @@ class BirdbodyGUI(tk.Frame):
                 pass
 
     def save_screen_names(self):
-        pass
+        udp = self.data_path_var.get().strip()
+        options = {}
+        options['defaultextension'] = '.txt'
+        options['filetypes'] = [('Textfile', '.txt')]
+        options['initialdir'] = os.path.join(udp, "screen_names")
+        options['initialfile'] = 'screen_name_list'
+        options['parent'] = self.root
+        options['title'] = 'Save list of screen names'
+        filepath = tk.filedialog.asksaveasfilename(**options)
+        if filepath:
+            sn_text = self.screen_names_text.get("0.0", "end")
+            sn_text = "\n".join([sn.strip() for sn in sn_text.split("\n")])
+            with open(filepath, "w") as handler:
+                handler.write(sn_text)
+            
+        
+
     def load_screen_names(self):
-        pass
+        udp = self.data_path_var.get().strip()
+        options = {}
+        options['defaultextension'] = '.txt'
+        options['filetypes'] = [('Textfile', '.txt')]
+        options['initialdir'] = os.path.join(udp, "screen_names")
+        options['initialfile'] = 'screen_name_list'
+        options['parent'] = self.root
+        options['title'] = 'Load list of screen names'
+        filepath = tk.filedialog.askopenfilename(**options)
+        if filepath:
+            with open(filepath, "r") as handler:
+                sn_text = handler.readlines()
+                sn_text = "\n".join([sn.strip() for sn in sn_text])
+                self.screen_names_text.delete("0.0", "end")
+                self.screen_names_text.insert("end", sn_text)
+        
 
     def ut_download_tweets(self):
         screen_names = []
