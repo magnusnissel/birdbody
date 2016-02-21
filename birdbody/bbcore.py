@@ -1,4 +1,5 @@
 import os
+import glob
 import datetime
 import tkinter as tk
 import tkinter.ttk as ttk
@@ -152,11 +153,13 @@ class BirdbodyGUI(tk.Frame):
         self.config_path = os.path.join(self.default_data_path, "config.ini")
         self.draw_ui()
         self.check_config()
+        logo_path = "@{}".format(os.path.join(os.path.dirname(os.path.realpath(__file__)),
+                                "birdbody_logo.xbm"))
+        self.root.wm_iconbitmap(logo_path)
         self.root.mainloop()
-        
 
     def draw_ui(self):
-        self.root.title("Birdbody - create corpora from tweets")
+        self.root.title("Birdbody - Create corpora from tweets")
         self.root.columnconfigure(0, weight=1)
         self.root.rowconfigure(0, weight=1)
         self.grid(row=0, column=0, sticky="news")
@@ -169,10 +172,13 @@ class BirdbodyGUI(tk.Frame):
         self.status_bar.grid(column=0, row=1, sticky="news")
         # --- main notebook --- #
         self.book = ttk.Notebook(self)
+        self.book.bind('<<NotebookTabChanged>>', self.tab_change)
         self.book.grid(column=0, row=0, sticky="news")
         self.user_tweets_frame = tk.Frame()
         self.settings_frame = tk.Frame()
+        self.file_frame = tk.Frame()
         self.book.add(self.user_tweets_frame, text="Tweets by users")
+        self.book.add(self.file_frame, text="File management")
         self.book.add(self.settings_frame, text="Settings")
         
         # --- settings --- #
@@ -231,19 +237,24 @@ class BirdbodyGUI(tk.Frame):
                 child.grid_configure(padx=5, pady=5)
             except tk.TclError:
                 pass
-
         # === user tweets === # 
-        self.user_tweets_frame.rowconfigure(0, weight=0)
+        self.user_tweets_frame.rowconfigure(0, weight=1)
         self.user_tweets_frame.rowconfigure(1, weight=1)
-        self.user_tweets_frame.columnconfigure(0, weight=0)
+        self.user_tweets_frame.columnconfigure(0, weight=1)
         self.user_tweets_frame.columnconfigure(1, weight=1)
         self.ut_main_frame = tk.Frame(self.user_tweets_frame)
         self.ut_main_frame.grid(row=0, column=0, sticky="news")
+        self.ut_main_frame.rowconfigure(0, weight=0)
+        self.ut_main_frame.rowconfigure(1, weight=1)
+        self.ut_main_frame.rowconfigure(2, weight=0)
+        self.ut_main_frame.rowconfigure(3, weight=0)
         self.ut_main_frame.columnconfigure(0, weight=0)
         self.ut_main_frame.columnconfigure(1, weight=0)
         self.ut_log_frame = tk.Frame(self.user_tweets_frame)
+        self.ut_log_frame.rowconfigure(0, weight=0)
+        self.ut_log_frame.rowconfigure(1, weight=1)
+        self.ut_log_frame.columnconfigure(0, weight=1)
         self.ut_log_frame.grid(row=0, column=1, sticky="news")
-
         # Main
         ttk.Label(self.ut_main_frame, font="verdana 12",
                  text="Insert twitter screen names below (one per line)").grid(row=0, column=0, 
@@ -255,24 +266,114 @@ class BirdbodyGUI(tk.Frame):
         self.ut_download_button = tk.Button(self.ut_main_frame,
                                          text="Download tweets", 
                                          command=self.ut_download_tweets)
-        self.load_sn_button = tk.Button(self.ut_main_frame, text="Load list of names", command=self.load_screen_names)
-        self.save_sn_button = tk.Button(self.ut_main_frame, text="Save list of names", command=self.save_screen_names)
+        self.load_sn_button = tk.Button(self.ut_main_frame, text="Load list of names",
+                                        command=self.load_screen_names)
+        self.save_sn_button = tk.Button(self.ut_main_frame, text="Save list of names",
+                                        command=self.save_screen_names)
         self.load_sn_button.grid(row=2, column=0, sticky="news")
         self.save_sn_button.grid(row=2, column=1, sticky="news")
         self.ut_download_button.grid(row=3, column=0, columnspan=2, sticky="news")
         # Log
-        ttk.Label(self.ut_log_frame, text="Log", font="verdana 12").grid(row=0, column=1, sticky="news")
+        ttk.Label(self.ut_log_frame, text="Log", font="verdana 12").grid(row=0, column=0, sticky="news")
         self.ut_log_text = tk.Text(self.ut_log_frame)
-        self.ut_log_text.grid(row=1, column=1, sticky="news")
-
-
-
-
+        self.ut_log_text.grid(row=1, column=0, sticky="news")
+        self.clear_log_button = tk.Button(self.ut_log_frame, text="Clear log",
+                                          command=self.ut_clear_log)
+        self.clear_log_button.grid(row=2, column=0, sticky="news")
+        # Apply padding to all elements
         for child in self.user_tweets_frame.winfo_children():
             try:
                 child.grid_configure(padx=5, pady=5)
             except tk.TclError:
                 pass
+        #=== File management frame ===#
+        self.file_frame.rowconfigure(2, weight=1)
+        ttk.Label(self.file_frame, font="verdana 12",
+                 text="Combine CSV files or export to XML / plaintext").grid(row=0, column=0, 
+                                                                 sticky="news")
+        self.csv_scroll = ttk.Scrollbar(self.file_frame)
+        self.csv_listbox = tk.Listbox(self.file_frame, selectmode='extended', exportselection=0, 
+                                      relief="flat", yscrollcommand=self.csv_scroll.set,
+                                      width=60)
+        self.csv_scroll.configure(command=self.csv_listbox.yview)
+        self.combine_csv_button = tk.Button(self.file_frame, text="Combine files",
+                                            command=self.combine_csv_files)
+        self.convert_to_xml_button = tk.Button(self.file_frame, text="Convert to .xml", command=None)
+        self.convert_to_txt_button = tk.Button(self.file_frame, text="Convert to .txt", command=None)
+        ttk.Label(self.file_frame, text="Filename for combination").grid(row=1, column=3,
+                                                                         sticky="new")
+        self.combine_csv_var = tk.StringVar()
+        self.combine_csv_entry = ttk.Entry(self.file_frame,
+                                           textvariable=self.combine_csv_var, width=30)
+        self.csv_listbox.grid(row=2, column=0, sticky="news", rowspan=3)
+        self.csv_scroll.grid(row=2, column=1, sticky="ns", rowspan=3)
+        self.combine_csv_button.grid(row=2, column=2, sticky="new")
+        self.convert_to_xml_button.grid(row=3, column=2, sticky="new")
+        self.convert_to_txt_button.grid(row=4, column=2, sticky="new")
+        self.combine_csv_entry.grid(row=2, column=3, sticky="new")
+        self.file_list_dirty = True # to check if refresh is needed, e.g. after adding file
+
+        for child in self.file_frame.winfo_children():
+            try:
+                child.grid_configure(padx=5, pady=5)
+            except tk.TclError:
+                pass
+
+
+    def combine_csv_files(self):
+        files = []
+        udp = self.data_path_var.get().strip()
+        dn = os.path.join(udp, "tweets", "csv")
+        sel = self.csv_listbox.curselection()
+        cfn = self.combine_csv_entry.get().replace(".csv", "").replace(".CSV", "").strip()
+        if not cfn: # avoid empty filenames, eventually ask here, for now use generic fn
+            now_str = str(datetime.datetime.now())
+            now_str = "".join([c if c.isalnum() else "-" for c in now_str])
+            cfn = "combined_tweets_{}.csv".format(now_str)
+        else:
+            cfn = "{}.csv".format(cfn)
+        combined_path =os.path.join(dn, cfn)
+        success = False
+        if len(sel) > 1:
+            self.update_status("Combining CSV files ...", ts=True)
+            for ind in sel:
+                f = self.csv_listbox.get(ind)
+                fp = os.path.join(dn, f)
+                files.append(fp)
+
+            if HAS_PANDAS: # debug
+                first = files[0]
+                rest = files[1:]
+                c_df = pd.DataFrame.from_csv(fp)
+                for fp in rest:
+                    df = pd.DataFrame.from_csv(fp)
+                    c_df = c_df.append(df)
+                c_df = c_df.drop_duplicates(subset=["TWEET_ID"])
+                c_df.to_csv(combined_path)
+                success = True
+            else:
+                all_rows = []
+                fields = set()
+                for fp in files:
+                    with open(fp, "r") as handler:
+                        reader = csv.DictReader(handler)
+                        fields.update(reader.fieldnames)  # to enable compatibility if diff metadata 
+                        all_rows.extend(row for row in reader)
+                fields = sorted(list(fields))
+                with open(combined_path, "w") as handler:
+                    writer = csv.DictWriter(handler, fieldnames=fields, dialect="excel")
+                    writer.writeheader()
+                    writer.writerows(all_rows)
+                    success = True
+
+            if success:
+                self.update_csv_file_list()
+                msg = "The combined file was saved to your data folder as '{}'.".format(cfn)
+                self.update_status(msg, ts=True)
+            else:
+                self.update_status("Sorry, there were problems combining the files.", ts=True)
+
+            self.csv_listbox.selection_clear("0", "end")
 
     def save_screen_names(self):
         udp = self.data_path_var.get().strip()
@@ -290,7 +391,8 @@ class BirdbodyGUI(tk.Frame):
             with open(filepath, "w") as handler:
                 handler.write(sn_text)
             
-        
+    def ut_clear_log(self):
+        self.ut_log_text.delete("0.0", "end")
 
     def load_screen_names(self):
         udp = self.data_path_var.get().strip()
@@ -337,11 +439,30 @@ class BirdbodyGUI(tk.Frame):
             self.root.after(250, self.check_download_status)
 
             #corpus.get_multi_user_tweets(screen_names)
-            
+
+    def update_csv_file_list(self):
+        self.csv_listbox.delete(0, "end")
+        udp = self.data_path_var.get().strip()
+        dn = os.path.join(udp, "tweets", "csv")
+        fp = os.path.join(dn, "*.csv")
+        for f in glob.iglob(fp):
+            fn = os.path.basename(f)
+            self.csv_listbox.insert("end", fn)
+
+    def tab_change(self, event):
+        self.tab_index = self.book.index(self.book.select())
+        if self.tab_index == 1 and self.file_list_dirty:
+            self.update_csv_file_list()
+
+
+
     def check_download_status(self):
         if not self.ut_download_worker_proc.is_alive():
             self.ut_download_worker_proc.join()
-            msg = "Done downloading tweets for all users."
+            udp = self.data_path_var.get().strip()
+            op = os.path.join(udp, "tweets", "csv")
+            msg = "Done downloading tweets for all users.\nTable saved to {}".format(op)
+            self.file_list_dirty = True
             self.update_status(msg, ts=True)
             self.write_to_log(msg, ts=True)
             self.ut_download_button.configure(text="Download tweets", state="normal")
