@@ -25,7 +25,8 @@ An executable of birdbody for Windows, that doesn't require Python to be install
 
 http://www.u203d.net/birdbody.zip
 
-Please note that at this point I can not guarantee that the Windows binary will always be up to date.
+Please note that I can not guarantee that the Windows binary will always be up to date, but I will do my best to update it
+whenever something import happens in this repository.
 
 How to use the Windows release:
 
