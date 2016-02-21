@@ -11,8 +11,7 @@ This allows you to generate the four credentials required to access the Twitter 
  * Access key
  * Access secret
 
-Add these in the fields in the "Settings" tab. If you want you can ask birdbody to store these locally so you don't need to
-type / copy them every time you open the app.
+Add these in the "Settings" tab.
 
 ## Requirements ##
   * Python 3
@@ -21,12 +20,12 @@ type / copy them every time you open the app.
 
 
 ## Windows ##
-An executable of birdbody for Windows, that doesn't require Python to be installed, can be downloaded here:
+An executable of birdbody for Windows can be downloaded here:
 
-http://www.u203d.net/birdbody.zip
+http://www.u203d.net/birdbody.exe
 
 Please note that I can not guarantee that the Windows binary will always be up to date, but I will do my best to update it
-whenever something import happens in this repository.
+whenever something import happens in this repository. Note that birdbody.exe takes a few seconds longer to load.
 
 How to use the Windows release:
 
