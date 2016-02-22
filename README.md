@@ -35,7 +35,7 @@ You can aggregate the CSV files to create larger collections.
 2. Select multiple CSV files from the list box (SHIFT+Click or CTRL+Click).
 3. Type in a filename  next to the "Combine files" button. (A generic name with timestamp will be used if empty).
 4. Click on "Combine files" and wait.
-5. The new combined file will appear in the tweets/csv folder and in the file list.
+5. The combined file(s) will appear in the tweets/csv folder and in the file list.
 
 ### Conversion to XML or plaintext ###
 You can convert the CSV files into plaintext (just the tweet texts separated by empty lines) or XML files (metadata is stored in attributes of <tweet> nodes, which contain the tweet texts).
@@ -64,6 +64,6 @@ How to use the Windows release:
 
  * Unzip the birdbody.zip folder
  * Execute birdbody.exe
- * 
+ 
  ## LICENSE ##
 GNU General Public License Version 3 (or later). See LICENSE file for more information.
