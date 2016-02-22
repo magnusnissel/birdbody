@@ -53,12 +53,12 @@ You can convert the CSV files into plaintext (just the tweet texts separated by 
 
 
 ## Windows ##
-An executable of birdbody for Windows can be downloaded here:
+An folder with an executable of birdbody for Windows can be downloaded here:
 
-http://www.u203d.net/birdbody.exe
+http://www.u203d.net/birdbody.zip
 
 Please note that I can not guarantee that the Windows binary will always be up to date, but I will do my best to update it
-whenever something import happens in this repository. Note that birdbody.exe takes a few seconds longer to load.
+whenever something import happens in this repository. 
 
 How to use the Windows release:
 
