@@ -8,6 +8,7 @@ import tkinter.filedialog
 import tweepy
 import csv
 import configparser
+from xml.etree import ElementTree as etree
 try:
     import appdirs
 except ImportError:
@@ -298,8 +299,8 @@ class BirdbodyGUI(tk.Frame):
         self.csv_scroll.configure(command=self.csv_listbox.yview)
         self.combine_csv_button = tk.Button(self.file_frame, text="Combine files",
                                             command=self.combine_csv_files)
-        self.convert_to_xml_button = tk.Button(self.file_frame, text="Convert to .xml", command=None)
-        self.convert_to_txt_button = tk.Button(self.file_frame, text="Convert to .txt", command=None)
+        self.convert_to_xml_button = tk.Button(self.file_frame, text="Convert to .xml", command=self.convert_to_xml)
+        self.convert_to_txt_button = tk.Button(self.file_frame, text="Convert to .txt", command=self.convert_to_txt)
         ttk.Label(self.file_frame, text="Filename for combination").grid(row=1, column=3,
                                                                          sticky="new")
         self.combine_csv_var = tk.StringVar()
@@ -319,6 +320,75 @@ class BirdbodyGUI(tk.Frame):
             except tk.TclError:
                 pass
 
+
+    def convert_to_txt(self):
+        udp = self.data_path_var.get().strip()
+        dn = os.path.join(udp, "tweets", "csv")
+        tdn = os.path.join(udp, "tweets", "txt")
+        try:
+            os.makedirs(tdn)
+        except IOError as e:
+            if e.errno != 17:
+                raise()
+        sel = self.csv_listbox.curselection()
+        if len(sel) > 0:
+            self.update_status("Converting CSV files to plaintext ...", ts=True)
+            for ind in sel:
+                fn = self.csv_listbox.get(ind)
+                tfn = fn.replace(".csv", ".txt")
+                tfp = os.path.join(tdn, tfn)
+                fp = os.path.join(dn, fn)
+                with open(fp, 'r') as c_handler:
+                    with open(tfp, "w") as t_handler:
+                        reader = csv.DictReader(c_handler)
+                        for row in reader:
+                            t_handler.write(row["TEXT"])
+                            t_handler.write("\n\n")
+                        self.update_status("Saved as {}".format(tfp))
+            self.update_status("All files converted and saved in {}".format(tdn))
+
+
+    def convert_to_xml(self):
+        udp = self.data_path_var.get().strip()
+        dn = os.path.join(udp, "tweets", "csv")
+        tdn = os.path.join(udp, "tweets", "xml")
+        try:
+            os.makedirs(tdn)
+        except IOError as e:
+            if e.errno != 17:
+                raise()
+        sel = self.csv_listbox.curselection()
+        if len(sel) > 0:
+            self.update_status("Converting CSV files to XML ...", ts=True)
+            for ind in sel:
+                fn = self.csv_listbox.get(ind)
+                tfn = fn.replace(".csv", ".xml")
+                tfp = os.path.join(tdn, tfn)
+                fp = os.path.join(dn, fn)
+                with open(fp, 'r') as c_handler:
+                    root = etree.Element('tweets')
+                    root.set("fileName", tfn)
+                    tree = etree.ElementTree(root)
+
+                    reader = csv.DictReader(c_handler)
+                    fields = list(reader.fieldnames)
+                    fields.remove("TEXT")
+                    fields.remove("")
+                    for row in reader:
+                            tweet = etree.SubElement(root, "tweet")
+                            tweet.text = row["TEXT"]
+                            for att in fields:
+                                tweet.set(self.all_caps_to_camel_case(att), row[att])
+                    tree.write(tfp, encoding="utf-8", xml_declaration=True,)
+                    self.update_status("Saved as {}".format(tfp))
+            self.update_status("All files converted and saved in {}".format(tdn))
+
+    @staticmethod
+    def all_caps_to_camel_case(s):
+        if s:
+            s = s.title().replace("_","")
+            s = "{}{}".format(s[0].lower(),s[1:])
+        return s
 
     def combine_csv_files(self):
         files = []
@@ -340,8 +410,7 @@ class BirdbodyGUI(tk.Frame):
                 f = self.csv_listbox.get(ind)
                 fp = os.path.join(dn, f)
                 files.append(fp)
-
-            if HAS_PANDAS: # debug
+            if HAS_PANDAS:
                 first = files[0]
                 rest = files[1:]
                 c_df = pd.DataFrame.from_csv(fp)
@@ -372,7 +441,6 @@ class BirdbodyGUI(tk.Frame):
                 self.update_status(msg, ts=True)
             else:
                 self.update_status("Sorry, there were problems combining the files.", ts=True)
-
             self.csv_listbox.selection_clear("0", "end")
 
     def save_screen_names(self):
