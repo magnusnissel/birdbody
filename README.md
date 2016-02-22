@@ -1,6 +1,7 @@
 # birdbody
-A graphical interface for creating twitter corpora. Still very much a work in progress.
-Based around the tweet_dumper.py gist by Yanofsky (https://gist.github.com/yanofsky/5436496)
+A graphical interface for creating twitter corpora. Still very much a work in progress. It currently gathers the most recent tweets of specified users. Other methods (e.g. searching for keywords/hashtags) will be added eventually.
+
+Originally based on the tweet_dumper.py gist by Yanofsky (https://gist.github.com/yanofsky/5436496).
 
 ## Usage notes ##
 You can easily create your own multi-user corpus in CSV, XML and TXT format using the steps outlined below.
@@ -63,3 +64,6 @@ How to use the Windows release:
 
  * Unzip the birdbody.zip folder
  * Execute birdbody.exe
+ * 
+ ## LICENSE ##
+GNU General Public License Version 3 (or later). See LICENSE file for more information.
