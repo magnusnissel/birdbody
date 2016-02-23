@@ -1,8 +1,8 @@
 from setuptools import setup, find_packages
 
 setup(name='birdbody',
-      version='0.0.1',
-      description='A tool for the creation of twitter corpora.',
+      version='0.1.1',
+      description='A tool for the creation of twitter corpora in CSV, XML or TXT format.',
       url='https://github.com/magnusnissel/birdbody',
       author='Magnus Nissel',
       author_email='magnus@nissel.org',

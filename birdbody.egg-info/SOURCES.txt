@@ -1,0 +1,12 @@
+setup.py
+birdbody/__init__.py
+birdbody/appdirs.py
+birdbody/bbcore.py
+birdbody/bbstart.py
+birdbody.egg-info/PKG-INFO
+birdbody.egg-info/SOURCES.txt
+birdbody.egg-info/dependency_links.txt
+birdbody.egg-info/entry_points.txt
+birdbody.egg-info/not-zip-safe
+birdbody.egg-info/requires.txt
+birdbody.egg-info/top_level.txt

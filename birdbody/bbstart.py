@@ -1,7 +1,9 @@
 import tkinter as tk
 import multiprocessing as mp
-from birdbody.bbcore import BirdbodyGUI
-
+try:
+	from birdbody.bbcore import BirdbodyGUI
+except ImportError:
+	from bbcore import BirdbodyGUI
 
 def main():
     root = tk.Tk()

@@ -1,0 +1,14 @@
+Metadata-Version: 1.1
+Name: birdbody
+Version: 0.1.1
+Summary: A tool for the creation of twitter corpora in CSV, XML or TXT format.
+Home-page: https://github.com/magnusnissel/birdbody
+Author: Magnus Nissel
+Author-email: magnus@nissel.org
+License: GPL
+Description: UNKNOWN
+Keywords: twitter,corpus,linguistics,digital humanities
+Platform: UNKNOWN
+Classifier: Development Status :: 3 - Alpha
+Classifier: Programming Language :: Python
+Classifier: Programming Language :: Python :: 3
