@@ -45,6 +45,13 @@ You can convert the CSV files into plaintext (just the tweet texts separated by 
 3. Click on "Convert to .xml" or "Convert to .txt" and wait.
 4. The files are stored in the tweets/xml or tweets/txt folders within your user data folder. 
 
+### Sharing corpora ###
+Twitter does not allow you to distribute the actual text corpus, but you can share all relevant Tweet IDs so that other people can recreate the corpus by downloading the tweets themselves (see "Tweets by ID" tab).
+
+1. Go to the "File management" tab.
+2. Select any number of CSV files.
+3. Click on "Export list of Tweet IDs"
+4. The ID list(s) will appear in the "tweet_ids" folder inside your data folder.
 
 ## Requirements ##
   * Python 3
