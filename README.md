@@ -1,5 +1,6 @@
 # birdbody
-A graphical interface for creating twitter corpora. Still very much a work in progress. It currently gathers the most recent tweets of specified users. Other methods (e.g. searching for keywords/hashtags) will be added eventually.
+A graphical interface for creating twitter corpora. Still very much a work in progress. It currently gathers the most recent tweets of specified users. It can also download tweets from a list of Tweet IDs (and generate this list for downloaded tweets).
+Other methods of data collection (e.g. searching for keywords/hashtags) will be added eventually.
 
 Originally based on the tweet_dumper.py gist by Yanofsky (https://gist.github.com/yanofsky/5436496).
 
