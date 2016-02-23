@@ -9,8 +9,9 @@ try:
 except ImportError:
     HAS_PANDAS = False
 
-def grab_tweets_by_ids(data_path, consumer_key, consumer_secret, tweet_ids, filename, conn=None):
-    auth = tweepy.AppAuthHandler(consumer_key, consumer_secret)
+def grab_tweets_by_ids(data_path, consumer_key, consumer_secret, access_key, access_secret, tweet_ids, filename, conn=None):
+    auth = tweepy.OAuthHandler(consumer_key, consumer_secret)
+    auth.set_access_token(access_key, access_secret)
     api = tweepy.API(auth, wait_on_rate_limit=True, wait_on_rate_limit_notify=True)
     start_time = datetime.datetime.now()
     id_tweets = []
