@@ -6,19 +6,21 @@ import tkinter.ttk as ttk
 import multiprocessing as mp
 import tkinter.filedialog
 import tweepy
+import json
 import csv
 import configparser
 import webbrowser
+import appdirs
 from xml.etree import ElementTree as etree
-try:
-    import appdirs
-except ImportError:
-    import birdbody.appdirs as appdirs
 try:
     import bbwork
 except ImportError:
     import birdbody.bbwork as bbwork
-
+HAS_PANDAS = True
+try:
+    import pandas as pd
+except ImportError:
+    HAS_PANDAS = False
 
 
 class BirdbodyGUI(tk.Frame):
@@ -26,7 +28,7 @@ class BirdbodyGUI(tk.Frame):
     def __init__(self, root):
         tk.Frame.__init__(self)
         self.root = root
-        self.default_data_path = appdirs.user_data_dir("birdbody", "Magnus Nissel")
+        self.default_data_path = appdirs.user_data_dir("birdbody", "u203d")
         try:
             os.makedirs(self.default_data_path)
         except OSError as e:
@@ -59,10 +61,308 @@ class BirdbodyGUI(tk.Frame):
         self.tweet_id_frame = tk.Frame()
         self.streaming_frame = tk.Frame()
         self.book.add(self.user_tweets_frame, text="Tweets by users")
+        self.book.add(self.streaming_frame, text="Stream tweets")
         self.book.add(self.tweet_id_frame, text="Tweets by ID")
         self.book.add(self.file_frame, text="File management")
         self.book.add(self.settings_frame, text="Settings")
         
+        self.draw_settings()
+        self.draw_user_tweets()
+        self.draw_tweet_id()
+        self.draw_streaming()
+        self.draw_file_management()
+
+
+    def draw_streaming(self):
+        self.streaming_frame.rowconfigure(0, weight=1)
+        self.streaming_frame.rowconfigure(1, weight=1)
+        self.streaming_frame.columnconfigure(0, weight=1)
+        self.streaming_frame.columnconfigure(1, weight=1)
+        self.st_main_frame = tk.Frame(self.streaming_frame)
+        self.st_main_frame.grid(row=0, column=0, sticky="news")
+        self.st_log_frame = tk.Frame(self.streaming_frame)
+        self.st_log_frame.rowconfigure(0, weight=0)
+        self.st_log_frame.rowconfigure(1, weight=1)
+        self.st_log_frame.columnconfigure(0, weight=1)
+        self.st_log_frame.grid(row=0, column=1, sticky="news")
+
+
+        ttk.Label(self.st_main_frame, text="Enter search strings, one per line",
+                                            font="verdana 12").grid(row=0, column=0, sticky="news")
+        self.st_search_text = tk.Text(self.st_main_frame)
+        ttk.Label(self.st_main_frame, text="Maximum number of tweets (0 = no limit)",
+                                            font="verdana 10").grid(row=2, column=0, sticky="news")
+        self.st_max_tweets_var = tk.IntVar()
+        self.st_max_tweets_spin = tk.Spinbox(self.st_main_frame, from_=0, width=10,
+                                             textvariable=self.st_max_tweets_var)
+        self.st_max_tweets_var.set(0)
+        ttk.Label(self.st_main_frame, text="Filename",
+                                            font="verdana 10").grid(row=4, column=0, sticky="news")
+        
+        self.st_filename_var = tk.StringVar()
+        self.st_filename_entry = ttk.Entry(self.st_main_frame, textvariable=self.st_filename_var)
+        self.start_stream_button = tk.Button(self.st_main_frame, text="Start streaming", 
+                                             command=self.start_streaming)
+
+        self.st_search_text.grid(row=1, column=0, columnspan=2, sticky="news")
+        self.st_max_tweets_spin.grid(row=2, column=1, sticky="news")
+        self.st_filename_entry.grid(row=5, column=0, columnspan=2, sticky="news")
+        self.start_stream_button.grid(row=6, column=0, columnspan=2, sticky="news")
+
+        ttk.Label(self.ut_log_frame, text="Log", font="verdana 12").grid(row=0, column=0, sticky="news")
+        self.st_log_text = tk.Text(self.st_log_frame)
+        self.st_log_text.grid(row=1, column=0, sticky="news")
+        self.clear_log_button = tk.Button(self.st_log_frame, text="Clear log",
+                                          command=self.st_clear_log)
+        self.clear_log_button.grid(row=2, column=0, sticky="news")
+        # Apply padding to all elements
+        for child in self.user_tweets_frame.winfo_children():
+            try:
+                child.grid_configure(padx=5, pady=5)
+            except tk.TclError:
+                pass
+        
+
+    def start_streaming(self, fn=None):
+        if self.start_stream_button["text"] == "Start streaming":
+            search_text = self.st_search_text.get("0.0", "end").strip()
+            search_str_list = search_text.split("\n")
+            search_str_list = list(filter(None, search_str_list)) 
+            if search_str_list:
+                msg = "Started streaming ..."
+                self.update_status(msg, ts=True)
+                self.st_write_to_log(msg, ts=True)
+                self.start_stream_button.configure(text="Stop streaming")
+                udp = self.data_path_var.get().strip()
+                ck = self.consumer_key_var.get().strip()
+                cs = self.consumer_secret_var.get().strip()
+                ak = self.access_key_var.get().strip()
+                acs = self.access_secret_var.get().strip()
+                try:
+                    max_tweets = int(self.st_max_tweets_spin.get())
+                except ValueError:
+                    max_tweets = 0  # no limit
+                fn = self.st_filename_var.get().strip()
+                if not fn: # avoid empty filename
+                    now_str = str(datetime.datetime.now())
+                    now_str = "".join([c if c.isalnum() else "-" for c in now_str])
+                    fn = "tweets_from_stream_{}".format(now_str) # no ext, .json and .csv used
+                self.stream_fn = fn  # needed to convert json to csv after proc done
+                self.st_conn, worker_conn = mp.Pipe()
+                self.st_worker_proc = mp.Process(target=bbwork.stream_tweets, args=(udp, fn, ck, cs, 
+                                                                                    ak, acs,
+                                                                                    search_str_list,
+                                                                                    max_tweets,
+                                                                                    worker_conn))
+                self.st_worker_proc.start()
+                self.root.update()
+                self.root.after(250, self.check_streaming_status)
+        else:
+            msg = "Stopping ..."
+            self.update_status(msg, ts=True)
+            self.st_write_to_log(msg, ts=True)
+            self.root.update_idletasks()
+            self.st_worker_proc.join()
+            self.st_conn.close()
+            udp = self.data_path_var.get().strip()
+            dn = os.path.join(udp, "tweets", "json")
+            msg = "Done streaming tweets.\nRaw JSON saved to {}".format(dn)
+            self.file_list_dirty = True
+            self.update_status(msg, ts=True)
+            self.st_write_to_log(msg, ts=True)
+            self.convert_json_to_csv(udp, self.stream_fn)
+            self.start_stream_button.configure(text="Start streaming")
+            self.root.update_idletasks()
+
+
+    def convert_json_to_csv(self, dn, fn):
+        """
+        this (and also the concat and conversion functions) should eventually be
+        put into separate processes so that they don't force the user to wait with large
+        files
+        """
+        json_dir = os.path.join(dn, "tweets", "json")
+        json_path = os.path.join(json_dir, "{}.json".format(fn))
+        csv_dir = os.path.join(dn, "tweets", "csv")
+        try:
+            os.makedirs(csv_dir)
+        except OSError as e:
+            if e.errno != 17:
+                raise()
+        csv_path = os.path.join(csv_dir, "{}.csv".format(fn))
+        with open(json_path, "r", encoding="utf-8") as handler:
+            data_lines = handler.readlines()
+            tweets = bbwork.tweets_to_dict_list(data_lines, from_json=True)
+            if HAS_PANDAS:
+                bbwork.pd_dict_list_to_csv(tweets, csv_path)
+                msg = "Tweets converted to CSV and saved as {}".format(csv_path)
+                self.update_status(msg, ts=True)
+                self.st_write_to_log(msg, ts=True)
+            else:
+                bbwork.dict_list_to_csv(tweets, csv_path)
+                msg = "Tweets converted to CSV and saved as {}".format(csv_path)
+                self.update_status(msg, ts=True)
+                self.st_write_to_log(msg, ts=True)
+
+
+    def check_streaming_status(self):
+        if not self.st_worker_proc.is_alive():
+            self.st_worker_proc.join()
+            udp = self.data_path_var.get().strip()
+            dn = os.path.join(udp, "tweets", "json")
+            msg = "Done streaming tweets.\nRaw JSON saved to {}".format(dn)
+            self.file_list_dirty = True
+            self.update_status(msg, ts=True)
+            self.st_write_to_log(msg, ts=True)
+            self.convert_json_to_csv(udp, self.stream_fn)
+            self.start_stream_button.configure(text="Start streaming")
+            self.root.update_idletasks()
+        else:
+            msg = self.st_conn.recv()
+            if msg:
+                self.update_status(msg, ts=True)
+                self.st_write_to_log(msg, ts=True)
+            self.root.update_idletasks()
+            self.root.after(250, self.check_streaming_status)
+
+    def draw_user_tweets(self):
+        self.user_tweets_frame.rowconfigure(0, weight=1)
+        self.user_tweets_frame.rowconfigure(1, weight=1)
+        self.user_tweets_frame.columnconfigure(0, weight=1)
+        self.user_tweets_frame.columnconfigure(1, weight=1)
+        self.ut_main_frame = tk.Frame(self.user_tweets_frame)
+        self.ut_main_frame.grid(row=0, column=0, sticky="news")
+        self.ut_main_frame.rowconfigure(0, weight=0)
+        self.ut_main_frame.rowconfigure(1, weight=1)
+        self.ut_main_frame.rowconfigure(2, weight=0)
+        self.ut_main_frame.rowconfigure(3, weight=0)
+        self.ut_main_frame.columnconfigure(0, weight=0)
+        self.ut_main_frame.columnconfigure(1, weight=0)
+        self.ut_log_frame = tk.Frame(self.user_tweets_frame)
+        self.ut_log_frame.rowconfigure(0, weight=0)
+        self.ut_log_frame.rowconfigure(1, weight=1)
+        self.ut_log_frame.columnconfigure(0, weight=1)
+        self.ut_log_frame.grid(row=0, column=1, sticky="news")
+        ttk.Label(self.ut_main_frame, font="verdana 12",
+                 text="Insert twitter screen names below (one per line)").grid(row=0, column=0, 
+                                                                            sticky="news")
+        self.screen_names_text = tk.Text(self.ut_main_frame)
+        self.screen_names_text.grid(row=1, column=0, columnspan=2, sticky="news")
+        self.ut_download_button = tk.Button(self.ut_main_frame,
+                                         text="Download tweets", 
+                                         command=self.ut_download_tweets)
+        self.load_sn_button = tk.Button(self.ut_main_frame, text="Load list of names",
+                                        command=self.load_screen_names)
+        self.save_sn_button = tk.Button(self.ut_main_frame, text="Save list of names",
+                                        command=self.save_screen_names)
+        self.load_sn_button.grid(row=2, column=0, sticky="news")
+        self.save_sn_button.grid(row=2, column=1, sticky="news")
+        self.ut_download_button.grid(row=3, column=0, columnspan=2, sticky="news")
+        # Log
+        ttk.Label(self.ut_log_frame, text="Log", font="verdana 12").grid(row=0, column=0, sticky="news")
+        self.ut_log_text = tk.Text(self.ut_log_frame)
+        self.ut_log_text.grid(row=1, column=0, sticky="news")
+        self.clear_log_button = tk.Button(self.ut_log_frame, text="Clear log",
+                                          command=self.ut_clear_log)
+        self.clear_log_button.grid(row=2, column=0, sticky="news")
+        # Apply padding to all elements
+        for child in self.user_tweets_frame.winfo_children():
+            try:
+                child.grid_configure(padx=5, pady=5)
+            except tk.TclError:
+                pass
+        
+    def draw_tweet_id(self):
+        # === tweet ID === # 
+        self.tweet_id_frame.rowconfigure(0, weight=1)
+        self.tweet_id_frame.rowconfigure(1, weight=1)
+        self.tweet_id_frame.columnconfigure(0, weight=1)
+        self.tweet_id_frame.columnconfigure(1, weight=1)
+        self.ti_main_frame = tk.Frame(self.tweet_id_frame)
+        self.ti_main_frame.grid(row=0, column=0, sticky="news")
+        self.ti_main_frame.rowconfigure(0, weight=0)
+        self.ti_main_frame.rowconfigure(1, weight=1)
+        self.ti_main_frame.rowconfigure(2, weight=0)
+        self.ti_main_frame.rowconfigure(3, weight=0)
+        self.ti_main_frame.columnconfigure(0, weight=0)
+        self.ti_main_frame.columnconfigure(1, weight=0)
+        self.ti_log_frame = tk.Frame(self.tweet_id_frame)
+        self.ti_log_frame.rowconfigure(0, weight=0)
+        self.ti_log_frame.rowconfigure(1, weight=1)
+        self.ti_log_frame.columnconfigure(0, weight=1)
+        self.ti_log_frame.grid(row=0, column=1, sticky="news")
+        
+        ttk.Label(self.ti_main_frame, font="verdana 12",
+                 text="Insert Tweet IDs below (one per line)").grid(row=0, column=0, sticky="news")
+        self.tweet_ids_text = tk.Text(self.ti_main_frame)
+        self.tweet_ids_text.grid(row=1, column=0, columnspan=2, sticky="news")
+        
+        self.ti_filename_var = tk.StringVar()
+        self.ti_filename_entry = ttk.Entry(self.ti_main_frame, textvariable=self.ti_filename_var)
+        self.ti_download_button = tk.Button(self.ti_main_frame,
+                                         text="Download tweets", 
+                                         command=self.ti_download_tweets)
+        self.load_ti_button = tk.Button(self.ti_main_frame, text="Load list of Tweet IDs",
+                                        command=self.load_tweet_ids)
+        self.load_ti_button.grid(row=2, column=0, columnspan=2, sticky="news")
+        ttk.Label(self.ti_main_frame, font="verdana 10", text="Filename").grid(row=3, column=0,
+                                                                               sticky="news")
+        self.ti_filename_entry.grid(row=4, column=0, columnspan=2, sticky="news")
+        self.ti_download_button.grid(row=5, column=0, columnspan=2, sticky="news")
+        # Log
+        ttk.Label(self.ti_log_frame, text="Log", font="verdana 12").grid(row=0, column=0, sticky="news")
+        self.ti_log_text = tk.Text(self.ti_log_frame)
+        self.ti_log_text.grid(row=1, column=0, sticky="news")
+        self.clear_log_button = tk.Button(self.ti_log_frame, text="Clear log",
+                                          command=self.ti_clear_log)
+        self.clear_log_button.grid(row=2, column=0, sticky="news")
+        # Apply padding to all elements
+        for child in self.tweet_id_frame.winfo_children():
+            try:
+                child.grid_configure(padx=5, pady=5)
+            except tk.TclError:
+                pass
+
+
+    def draw_file_management(self):
+        #=== File management frame ===#
+        self.file_frame.rowconfigure(2, weight=1)
+        ttk.Label(self.file_frame, font="verdana 12",
+                 text="Combine CSV files or export to XML / plaintext").grid(row=0, column=0, 
+                                                                 sticky="news")
+        self.csv_scroll = ttk.Scrollbar(self.file_frame)
+        self.csv_listbox = tk.Listbox(self.file_frame, selectmode='extended', exportselection=0, 
+                                      relief="flat", yscrollcommand=self.csv_scroll.set,
+                                      width=60)
+        self.csv_scroll.configure(command=self.csv_listbox.yview)
+        self.combine_csv_button = tk.Button(self.file_frame, text="Combine files",
+                                            command=self.combine_csv_files)
+        self.convert_to_xml_button = tk.Button(self.file_frame, text="Convert to .xml", command=self.convert_to_xml)
+        self.convert_to_txt_button = tk.Button(self.file_frame, text="Convert to .txt", command=self.convert_to_txt)
+        ttk.Label(self.file_frame, text="Filename for combination").grid(row=1, column=3,
+                                                                         sticky="new")
+        self.combine_csv_var = tk.StringVar()
+        self.combine_csv_entry = ttk.Entry(self.file_frame,
+                                           textvariable=self.combine_csv_var, width=30)
+        self.save_tweet_ids_button = tk.Button(self.file_frame, 
+                                                 text="Export list of Tweet IDs",
+                                                 command=self.save_tweet_ids)
+        self.csv_listbox.grid(row=2, column=0, sticky="news", rowspan=4)
+        self.csv_scroll.grid(row=2, column=1, sticky="ns", rowspan=4)
+        self.combine_csv_button.grid(row=2, column=2, sticky="new")
+        self.combine_csv_entry.grid(row=2, column=3, sticky="new")
+        self.convert_to_xml_button.grid(row=3, column=2, sticky="new")
+        self.convert_to_txt_button.grid(row=4, column=2, sticky="new")
+        self.save_tweet_ids_button.grid(row=5, column=2, sticky="new")
+        self.file_list_dirty = True # to check if refresh is needed, e.g. after adding file
+        for child in self.file_frame.winfo_children():
+            try:
+                child.grid_configure(padx=5, pady=5)
+            except tk.TclError:
+                pass
+
+
+    def draw_settings(self):
         # --- settings --- #
         self.settings_frame.rowconfigure(0, weight=0)
         self.settings_frame.columnconfigure(0, weight=0)
@@ -122,148 +422,7 @@ class BirdbodyGUI(tk.Frame):
                 child.grid_configure(padx=5, pady=5)
             except tk.TclError:
                 pass
-        # === user tweets === # 
-        self.user_tweets_frame.rowconfigure(0, weight=1)
-        self.user_tweets_frame.rowconfigure(1, weight=1)
-        self.user_tweets_frame.columnconfigure(0, weight=1)
-        self.user_tweets_frame.columnconfigure(1, weight=1)
-        self.ut_main_frame = tk.Frame(self.user_tweets_frame)
-        self.ut_main_frame.grid(row=0, column=0, sticky="news")
-        self.ut_main_frame.rowconfigure(0, weight=0)
-        self.ut_main_frame.rowconfigure(1, weight=1)
-        self.ut_main_frame.rowconfigure(2, weight=0)
-        self.ut_main_frame.rowconfigure(3, weight=0)
-        self.ut_main_frame.columnconfigure(0, weight=0)
-        self.ut_main_frame.columnconfigure(1, weight=0)
-        self.ut_log_frame = tk.Frame(self.user_tweets_frame)
-        self.ut_log_frame.rowconfigure(0, weight=0)
-        self.ut_log_frame.rowconfigure(1, weight=1)
-        self.ut_log_frame.columnconfigure(0, weight=1)
-        self.ut_log_frame.grid(row=0, column=1, sticky="news")
-        
-        ttk.Label(self.ut_main_frame, font="verdana 12",
-                 text="Insert twitter screen names below (one per line)").grid(row=0, column=0, 
-                                                                            sticky="news")
-        self.screen_names_text = tk.Text(self.ut_main_frame)
-        self.screen_names_text.grid(row=1, column=0, columnspan=2, sticky="news")
-        
-        
-        self.ut_download_button = tk.Button(self.ut_main_frame,
-                                         text="Download tweets", 
-                                         command=self.ut_download_tweets)
-        self.load_sn_button = tk.Button(self.ut_main_frame, text="Load list of names",
-                                        command=self.load_screen_names)
-        self.save_sn_button = tk.Button(self.ut_main_frame, text="Save list of names",
-                                        command=self.save_screen_names)
-        self.load_sn_button.grid(row=2, column=0, sticky="news")
-        self.save_sn_button.grid(row=2, column=1, sticky="news")
-        self.ut_download_button.grid(row=3, column=0, columnspan=2, sticky="news")
-        # Log
-        ttk.Label(self.ut_log_frame, text="Log", font="verdana 12").grid(row=0, column=0, sticky="news")
-        self.ut_log_text = tk.Text(self.ut_log_frame)
-        self.ut_log_text.grid(row=1, column=0, sticky="news")
-        self.clear_log_button = tk.Button(self.ut_log_frame, text="Clear log",
-                                          command=self.ut_clear_log)
-        self.clear_log_button.grid(row=2, column=0, sticky="news")
-        # Apply padding to all elements
-        for child in self.user_tweets_frame.winfo_children():
-            try:
-                child.grid_configure(padx=5, pady=5)
-            except tk.TclError:
-                pass
-        
-        # === tweet ID === # 
-        self.tweet_id_frame.rowconfigure(0, weight=1)
-        self.tweet_id_frame.rowconfigure(1, weight=1)
-        self.tweet_id_frame.columnconfigure(0, weight=1)
-        self.tweet_id_frame.columnconfigure(1, weight=1)
-        self.ti_main_frame = tk.Frame(self.tweet_id_frame)
-        self.ti_main_frame.grid(row=0, column=0, sticky="news")
-        self.ti_main_frame.rowconfigure(0, weight=0)
-        self.ti_main_frame.rowconfigure(1, weight=1)
-        self.ti_main_frame.rowconfigure(2, weight=0)
-        self.ti_main_frame.rowconfigure(3, weight=0)
-        self.ti_main_frame.columnconfigure(0, weight=0)
-        self.ti_main_frame.columnconfigure(1, weight=0)
-        self.ti_log_frame = tk.Frame(self.tweet_id_frame)
-        self.ti_log_frame.rowconfigure(0, weight=0)
-        self.ti_log_frame.rowconfigure(1, weight=1)
-        self.ti_log_frame.columnconfigure(0, weight=1)
-        self.ti_log_frame.grid(row=0, column=1, sticky="news")
-        
-        ttk.Label(self.ti_main_frame, font="verdana 12",
-                 text="Insert Tweet IDs below (one per line)").grid(row=0, column=0, sticky="news")
-        self.tweet_ids_text = tk.Text(self.ti_main_frame)
-        self.tweet_ids_text.grid(row=1, column=0, columnspan=2, sticky="news")
-        
-        self.ti_filename_var = tk.StringVar()
-        self.ti_filename_entry = ttk.Entry(self.ti_main_frame, textvariable=self.ti_filename_var)
-        self.ti_download_button = tk.Button(self.ti_main_frame,
-                                         text="Download tweets", 
-                                         command=self.ti_download_tweets)
-        self.load_ti_button = tk.Button(self.ti_main_frame, text="Load list of Tweet IDs",
-                                        command=self.load_tweet_ids)
-        self.load_ti_button.grid(row=2, column=0, columnspan=2, sticky="news")
-        ttk.Label(self.ti_main_frame, font="verdana 10", text="Filename").grid(row=3, column=0,
-                                                                               sticky="news")
-        self.ti_filename_entry.grid(row=4, column=0, columnspan=2, sticky="news")
-        self.ti_download_button.grid(row=5, column=0, columnspan=2, sticky="news")
-        # Log
-        ttk.Label(self.ti_log_frame, text="Log", font="verdana 12").grid(row=0, column=0, sticky="news")
-        self.ti_log_text = tk.Text(self.ti_log_frame)
-        self.ti_log_text.grid(row=1, column=0, sticky="news")
-        self.clear_log_button = tk.Button(self.ti_log_frame, text="Clear log",
-                                          command=self.ti_clear_log)
-        self.clear_log_button.grid(row=2, column=0, sticky="news")
-        # Apply padding to all elements
-        for child in self.tweet_id_frame.winfo_children():
-            try:
-                child.grid_configure(padx=5, pady=5)
-            except tk.TclError:
-                pass
-        
-        
 
-        #=== File management frame ===#
-        self.file_frame.rowconfigure(2, weight=1)
-        ttk.Label(self.file_frame, font="verdana 12",
-                 text="Combine CSV files or export to XML / plaintext").grid(row=0, column=0, 
-                                                                 sticky="news")
-        self.csv_scroll = ttk.Scrollbar(self.file_frame)
-        self.csv_listbox = tk.Listbox(self.file_frame, selectmode='extended', exportselection=0, 
-                                      relief="flat", yscrollcommand=self.csv_scroll.set,
-                                      width=60)
-        self.csv_scroll.configure(command=self.csv_listbox.yview)
-        self.combine_csv_button = tk.Button(self.file_frame, text="Combine files",
-                                            command=self.combine_csv_files)
-        self.convert_to_xml_button = tk.Button(self.file_frame, text="Convert to .xml", command=self.convert_to_xml)
-        self.convert_to_txt_button = tk.Button(self.file_frame, text="Convert to .txt", command=self.convert_to_txt)
-        ttk.Label(self.file_frame, text="Filename for combination").grid(row=1, column=3,
-                                                                         sticky="new")
-        self.combine_csv_var = tk.StringVar()
-        self.combine_csv_entry = ttk.Entry(self.file_frame,
-                                           textvariable=self.combine_csv_var, width=30)
-        self.save_tweet_ids_button = tk.Button(self.file_frame, 
-                                                 text="Export list of Tweet IDs",
-                                                 command=self.save_tweet_ids)
-        
-        self.csv_listbox.grid(row=2, column=0, sticky="news", rowspan=4)
-        self.csv_scroll.grid(row=2, column=1, sticky="ns", rowspan=4)
-        self.combine_csv_button.grid(row=2, column=2, sticky="new")
-        self.combine_csv_entry.grid(row=2, column=3, sticky="new")
-        self.convert_to_xml_button.grid(row=3, column=2, sticky="new")
-        self.convert_to_txt_button.grid(row=4, column=2, sticky="new")
-        self.save_tweet_ids_button.grid(row=5, column=2, sticky="new")
-        self.file_list_dirty = True # to check if refresh is needed, e.g. after adding file
-
-        
-
-        
-        for child in self.file_frame.winfo_children():
-            try:
-                child.grid_configure(padx=5, pady=5)
-            except tk.TclError:
-                pass
 
     def help_with_credentials(self):
         """ placeholder for feature that will help users generate their keys.
@@ -433,7 +592,10 @@ class BirdbodyGUI(tk.Frame):
             sn_text = "\n".join([sn.strip() for sn in sn_text.split("\n")])
             with open(filepath, "w") as handler:
                 handler.write(sn_text)
-            
+
+    def st_clear_log(self):
+        self.st_log_text.delete("0.0", "end")
+
     def ut_clear_log(self):
         self.ut_log_text.delete("0.0", "end")
 
@@ -530,7 +692,6 @@ class BirdbodyGUI(tk.Frame):
             acs = self.access_secret_var.get().strip()
             self.ut_download_button.configure(text="Download tweets", state="disabled")
             self.ut_conn, worker_conn = mp.Pipe()
-            # data_path, consumer_key, consumer_secret, access_key, access_secret
             self.ut_worker_proc = mp.Process(target=bbwork.grab_tweets_from_users, args=(udp, ck, 
                                                                                         cs, ak, acs,
                                                                                         screen_names,
@@ -593,7 +754,6 @@ class BirdbodyGUI(tk.Frame):
                 self.write_to_log(msg, ts=True)
             self.root.update_idletasks()
             self.root.after(250, self.check_ut_download_status)
-        
 
     def update_status(self, text, ts=False, color=None):
         if ts:
@@ -616,6 +776,14 @@ class BirdbodyGUI(tk.Frame):
             text = "{} ({})".format(text, now)
         self.ti_log_text.insert("end", text)
         self.ti_log_text.insert("end", "\n")
+
+    def st_write_to_log(self, text, ts=False):
+        if ts:
+            now = datetime.datetime.now().isoformat()[:19].replace("T"," ")
+            text = "{} ({})".format(text, now)
+        self.st_log_text.insert("end", text)
+        self.st_log_text.insert("end", "\n")
+
 
     def save_data_path(self):
         udp = self.data_path_var.get().strip()

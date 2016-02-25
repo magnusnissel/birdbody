@@ -2,6 +2,7 @@ import os
 import datetime
 import csv
 import tweepy
+import json
 
 HAS_PANDAS = True
 try:
@@ -9,7 +10,79 @@ try:
 except ImportError:
     HAS_PANDAS = False
 
-def grab_tweets_by_ids(data_path, consumer_key, consumer_secret, access_key, access_secret, tweet_ids, filename, conn=None):
+
+class BirdBodyListener(tweepy.StreamListener):
+    """ 
+    Copied from tweepy/streaming.py, then modified.
+    Tweets are originally saved in the json they come in to avoid
+    delays due to processing, then converted to the csv format when
+    streaming is over
+    """
+    def __init__(self, json_path, max_tweets, conn=None):
+        super().__init__()
+        self.json_path = json_path
+        self.conn = conn
+        self.num_tweets = 0
+        self.max_tweets = max_tweets
+
+    def on_data(self, data):
+        with open(self.json_path,'a') as handler:
+            handler.write(data)
+        self.num_tweets += 1
+        m = self.num_tweets % 25  # notify every 25 tweets
+        if m == 0 and self.num_tweets > 0:
+            if self.max_tweets > 0:
+                msg = "Collected {}/{} tweets so far.".format(self.num_tweets, self.max_tweets)
+            else:
+                msg = "Collected {} tweets so far.".format(self.num_tweets)
+                
+            if self.conn:
+                self.conn.send(msg)
+            else:
+                print(msg)
+        if self.max_tweets > 0 and self.num_tweets >= self.max_tweets:
+            if self.conn:
+                self.conn.send("Reached target number of tweets.")
+            else:
+                print("Reached target number of tweets.")
+            return False
+        else:
+            return True
+
+    def on_error(self, status):
+        if status == 420:  # Rate Limited
+            #returning False in on_data disconnects the stream
+            if self.conn:
+                self.conn.send("Rate limited reached. Will stop streaming.", ts=True)
+            else:
+                print("Rate limit reached. Will stop streaming.")
+            return False
+        else:
+            if self.conn:
+                self.conn.send(status)
+            else:
+                print(status)
+            return True
+
+def stream_tweets(data_path, fn, consumer_key, consumer_secret, access_key, access_secret, 
+                  search_str_list, max_tweets, conn=None):
+    json_dir = os.path.join(data_path, "tweets", "json")
+    try:
+        os.makedirs(json_dir)
+    except OSError as e:
+        if e.errno != 17:
+            raise()
+    json_path = os.path.join(json_dir, "{}.json".format(fn))
+    auth = tweepy.OAuthHandler(consumer_key, consumer_secret)
+    auth.set_access_token(access_key, access_secret)
+    api = tweepy.API(auth, wait_on_rate_limit=True, wait_on_rate_limit_notify=True)
+    stream_listener = BirdBodyListener(json_path, max_tweets, conn)
+    stream = tweepy.Stream(auth = api.auth, listener=stream_listener)
+    stream.filter(track=search_str_list, async=False)
+
+
+def grab_tweets_by_ids(data_path, consumer_key, consumer_secret, access_key, access_secret, 
+                       tweet_ids, filename, conn=None):
     auth = tweepy.OAuthHandler(consumer_key, consumer_secret)
     auth.set_access_token(access_key, access_secret)
     api = tweepy.API(auth, wait_on_rate_limit=True, wait_on_rate_limit_notify=True)
@@ -49,11 +122,7 @@ def grab_tweets_by_ids(data_path, consumer_key, consumer_secret, access_key, acc
 def grab_tweets_from_users(data_path, consumer_key, consumer_secret, access_key, access_secret, 
                         screen_names, conn=None):
     # used to be user level authentication, app authentication seems better for this task
-    #auth = tweepy.OAuthHandler(consumer_key, consumer_secret)
-    #auth.set_access_token(access_key, access_secret)
     auth = tweepy.AppAuthHandler(consumer_key, consumer_secret)
-
-
     api = tweepy.API(auth, wait_on_rate_limit=True, wait_on_rate_limit_notify=True)
     start_time = datetime.datetime.now()
     for sn in screen_names:
@@ -113,29 +182,47 @@ def grab_tweets_for_user(api, screen_name, conn=None):
             else:
                 print(msg)
     return user_tweets
-    
-    
 
-def tweets_to_dict_list(tweets):
+def tweets_to_dict_list(tweets, from_json=False):
     today = datetime.datetime.now().date()
     tweet_dict_list = []
-    for tweet in tweets:
-        t = {}
-        t["TWEET_ID"] = tweet.id_str
-        t["CREATED"] = tweet.created_at 
-        t["TEXT"] = tweet.text
-        if tweet.in_reply_to_user_id:
-            t["IS_REPLY"] = True
-        else:
-            t["IS_REPLY"] = False
-        t["LANGUAGE"] = tweet.lang
-        t["SCREEN_NAME"] = tweet.user.screen_name
-        t["NAME"] = tweet.user.name
-        t["LOCATION"] = tweet.user.location
-        t["VERIFIED"] = tweet.user.verified
-        t["ACCOUNT_CREATED"] = tweet.user.created_at
-        t["COLLECTED"] = today
-        tweet_dict_list.append(t)
+    if from_json:  # when tweets are created via json module vs. from tweepy api call
+        for tweet in tweets:
+            tweet = json.loads(tweet)
+            t = {}
+            t["TWEET_ID"] = tweet["id_str"]
+            t["CREATED"] = tweet["created_at"] 
+            t["TEXT"] = tweet["text"]
+            if tweet["in_reply_to_user_id"]:
+                t["IS_REPLY"] = True
+            else:
+                t["IS_REPLY"] = False
+            t["LANGUAGE"] = tweet["lang"]
+            t["SCREEN_NAME"] = tweet["user"]["screen_name"]
+            t["NAME"] = tweet["user"]["name"]
+            t["LOCATION"] = tweet["user"]["location"]
+            t["VERIFIED"] = tweet["user"]["verified"]
+            t["ACCOUNT_CREATED"] = tweet["user"]["created_at"]
+            t["COLLECTED"] = today
+            tweet_dict_list.append(t)
+    else:
+        for tweet in tweets:
+            t = {}
+            t["TWEET_ID"] = tweet.id_str
+            t["CREATED"] = tweet.created_at 
+            t["TEXT"] = tweet.text
+            if tweet.in_reply_to_user_id:
+                t["IS_REPLY"] = True
+            else:
+                t["IS_REPLY"] = False
+            t["LANGUAGE"] = tweet.lang
+            t["SCREEN_NAME"] = tweet.user.screen_name
+            t["NAME"] = tweet.user.name
+            t["LOCATION"] = tweet.user.location
+            t["VERIFIED"] = tweet.user.verified
+            t["ACCOUNT_CREATED"] = tweet.user.created_at
+            t["COLLECTED"] = today
+            tweet_dict_list.append(t)
     return tweet_dict_list
 
 
@@ -177,6 +264,20 @@ def id_tweets_to_csv(data_path, filename, tweets, conn=None, add_date_to_fn=True
             writer = csv.DictWriter(handler, fieldnames=fields, dialect="excel")
             writer.writeheader()
             writer.writerows(tweet_dict_list)
+
+
+def dict_list_to_csv(dict_list, csv_path):
+    if len(dict_list) > 0:
+        fields = sorted(list(dict_list[0].keys()))
+        with open(csv_path, "w", newline="", encoding="utf-8") as handler:
+            writer = csv.DictWriter(handler, fieldnames=fields, dialect="excel")
+            writer.writeheader()
+            writer.writerows(dict_list)
+
+def pd_dict_list_to_csv(dict_list, csv_path):
+    df = pd.DataFrame.from_dict(dict_list)
+    if len(df.index) > 0:
+        df.to_csv(csv_path)
 
 def pd_user_tweets_to_csv(data_path, tweets, screen_name, conn=None, add_date_to_fn=True):
     tweet_dict_list = tweets_to_dict_list(tweets)
