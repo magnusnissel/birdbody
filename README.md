@@ -27,6 +27,16 @@ Birdbody can download as many recent tweets of a user as Twitter allows (around 
 6. Open the .csv files with the program of your choice
 7. If you want XML or plaintext files for use with concordancers, see "Conversion" below
 
+### Streaming tweets ###
+Birdbody can listen to the Twitter stream and collect tweets matching search strings.
+
+1. Go to the "Stream tweets" tab.
+2. Type in a number of search terms to listen for.
+3. Optional: Specify a maximum number of tweets to collect.
+4. Click on "Start streaming" to start and again to stop.
+5. After streaming ends, Birdbody may take a while to convert the tweets to CSV.
+
+There is a button for JSON-to-CSV conversion in streaming does not stop regularly. This could happen if the software or computer crashes / shuts down during long streaming sessions.
 
 ### Creating corpora ###
 You can aggregate the CSV files to create larger collections.
