@@ -26,7 +26,7 @@ class BirdBodyListener(tweepy.StreamListener):
         self.max_tweets = max_tweets
 
     def on_data(self, data):
-        with open(self.json_path,'a') as handler:
+        with open(self.json_path,'a', encoding="utf-8") as handler:
             handler.write(data)
         self.num_tweets += 1
         m = self.num_tweets % 25  # notify every 25 tweets
@@ -37,18 +37,24 @@ class BirdBodyListener(tweepy.StreamListener):
                 msg = "Collected {} tweets so far.".format(self.num_tweets)
                 
             if self.conn:
-                self.conn.send(msg)
+                try:
+                    self.conn.send(msg)
+                except:
+                    pass  # it's fine to loose that feedback for whatever reason, most likely cancelling proc
             else:
                 print(msg)
         if self.max_tweets > 0 and self.num_tweets >= self.max_tweets:
             if self.conn:
-                self.conn.send("Reached target number of tweets.")
+                try:
+                    self.conn.send("Reached target number of tweets.")
+                except:
+                    pass # see above
             else:
                 print("Reached target number of tweets.")
             return False
         else:
             return True
-
+        
     def on_error(self, status):
         if status == 420:  # Rate Limited
             #returning False in on_data disconnects the stream
@@ -188,23 +194,25 @@ def tweets_to_dict_list(tweets, from_json=False):
     tweet_dict_list = []
     if from_json:  # when tweets are created via json module vs. from tweepy api call
         for tweet in tweets:
-            tweet = json.loads(tweet)
-            t = {}
-            t["TWEET_ID"] = tweet["id_str"]
-            t["CREATED"] = tweet["created_at"] 
-            t["TEXT"] = tweet["text"]
-            if tweet["in_reply_to_user_id"]:
-                t["IS_REPLY"] = True
-            else:
-                t["IS_REPLY"] = False
-            t["LANGUAGE"] = tweet["lang"]
-            t["SCREEN_NAME"] = tweet["user"]["screen_name"]
-            t["NAME"] = tweet["user"]["name"]
-            t["LOCATION"] = tweet["user"]["location"]
-            t["VERIFIED"] = tweet["user"]["verified"]
-            t["ACCOUNT_CREATED"] = tweet["user"]["created_at"]
-            t["COLLECTED"] = today
-            tweet_dict_list.append(t)
+            tweet = tweet.strip("\n").strip("")
+            if tweet:
+                tweet = json.loads(tweet)
+                t = {}
+                t["TWEET_ID"] = tweet["id_str"]
+                t["CREATED"] = tweet["created_at"] 
+                t["TEXT"] = tweet["text"]
+                if tweet["in_reply_to_user_id"]:
+                    t["IS_REPLY"] = True
+                else:
+                    t["IS_REPLY"] = False
+                t["LANGUAGE"] = tweet["lang"]
+                t["SCREEN_NAME"] = tweet["user"]["screen_name"]
+                t["NAME"] = tweet["user"]["name"]
+                t["LOCATION"] = tweet["user"]["location"]
+                t["VERIFIED"] = tweet["user"]["verified"]
+                t["ACCOUNT_CREATED"] = tweet["user"]["created_at"]
+                t["COLLECTED"] = today
+                tweet_dict_list.append(t)
     else:
         for tweet in tweets:
             t = {}

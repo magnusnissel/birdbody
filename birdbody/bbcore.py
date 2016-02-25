@@ -161,18 +161,8 @@ class BirdbodyGUI(tk.Frame):
             msg = "Stopping ..."
             self.update_status(msg, ts=True)
             self.st_write_to_log(msg, ts=True)
-            self.root.update_idletasks()
-            self.st_worker_proc.join()
-            self.st_conn.close()
-            udp = self.data_path_var.get().strip()
-            dn = os.path.join(udp, "tweets", "json")
-            msg = "Done streaming tweets.\nRaw JSON saved to {}".format(dn)
-            self.file_list_dirty = True
-            self.update_status(msg, ts=True)
-            self.st_write_to_log(msg, ts=True)
-            self.convert_json_to_csv(udp, self.stream_fn)
-            self.start_stream_button.configure(text="Start streaming")
-            self.root.update_idletasks()
+            self.root.update()
+            self.st_worker_proc.terminate()
 
 
     def convert_json_to_csv(self, dn, fn):
