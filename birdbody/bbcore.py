@@ -85,8 +85,6 @@ class BirdbodyGUI(tk.Frame):
         self.st_log_frame.rowconfigure(1, weight=1)
         self.st_log_frame.columnconfigure(0, weight=1)
         self.st_log_frame.grid(row=0, column=1, sticky="news")
-
-
         ttk.Label(self.st_main_frame, text="Enter search strings, one per line",
                                             font="verdana 12").grid(row=0, column=0, sticky="news")
         self.st_search_text = tk.Text(self.st_main_frame)
@@ -97,7 +95,7 @@ class BirdbodyGUI(tk.Frame):
                                              textvariable=self.st_max_tweets_var)
         self.st_max_tweets_var.set(0)
         ttk.Label(self.st_main_frame, text="Filename",
-                                            font="verdana 10").grid(row=4, column=0, sticky="news")
+                  font="verdana 10").grid(row=4, column=0, sticky="news")
         
         self.st_filename_var = tk.StringVar()
         self.st_filename_entry = ttk.Entry(self.st_main_frame, textvariable=self.st_filename_var)
@@ -109,18 +107,17 @@ class BirdbodyGUI(tk.Frame):
         self.st_filename_entry.grid(row=5, column=0, columnspan=2, sticky="news")
         self.start_stream_button.grid(row=6, column=0, columnspan=2, sticky="news")
 
-        ttk.Label(self.ut_log_frame, text="Log", font="verdana 12").grid(row=0, column=0, sticky="news")
-        self.st_log_text = tk.Text(self.st_log_frame)
+        ttk.Label(self.st_log_frame, text="Log", font="verdana 12").grid(row=0, column=0,
+                  sticky="news")
+        self.st_log_scroll = ttk.Scrollbar(self.st_log_frame)
+        self.st_log_text = tk.Text(self.st_log_frame, yscrollcommand=self.st_log_scroll.set)
+        self.st_log_scroll.configure(command=self.st_log_text.yview)
         self.st_log_text.grid(row=1, column=0, sticky="news")
+        self.st_log_scroll.grid(row=1, column=1, sticky="news")
         self.clear_log_button = tk.Button(self.st_log_frame, text="Clear log",
                                           command=self.st_clear_log)
-        self.clear_log_button.grid(row=2, column=0, sticky="news")
-        # Apply padding to all elements
-        for child in self.user_tweets_frame.winfo_children():
-            try:
-                child.grid_configure(padx=5, pady=5)
-            except tk.TclError:
-                pass
+        self.clear_log_button.grid(row=2, column=0, columnspan=2, sticky="news")
+
         
 
     def start_streaming(self, fn=None):
@@ -163,6 +160,7 @@ class BirdbodyGUI(tk.Frame):
             self.st_write_to_log(msg, ts=True)
             self.root.update()
             self.st_worker_proc.terminate()
+            self.check_streaming_status()
 
 
     def convert_json_to_csv(self, dn, fn):
@@ -171,6 +169,9 @@ class BirdbodyGUI(tk.Frame):
         put into separate processes so that they don't force the user to wait with large
         files
         """
+        msg = "Started conversion from JSON to CSV ..."
+        self.update_status(msg, ts=True)
+        self.st_write_to_log(msg, ts=True)
         json_dir = os.path.join(dn, "tweets", "json")
         json_path = os.path.join(json_dir, "{}.json".format(fn))
         csv_dir = os.path.join(dn, "tweets", "csv")
@@ -250,18 +251,15 @@ class BirdbodyGUI(tk.Frame):
         self.ut_download_button.grid(row=3, column=0, columnspan=2, sticky="news")
         # Log
         ttk.Label(self.ut_log_frame, text="Log", font="verdana 12").grid(row=0, column=0, sticky="news")
-        self.ut_log_text = tk.Text(self.ut_log_frame)
+        self.ut_log_scroll = ttk.Scrollbar(self.ut_log_frame)
+        self.ut_log_text = tk.Text(self.ut_log_frame, yscrollcommand=self.ut_log_scroll.set)
+        self.ut_log_scroll.configure(command=self.ut_log_text.yview)
         self.ut_log_text.grid(row=1, column=0, sticky="news")
+        self.ut_log_scroll.grid(row=1, column=1, sticky="news")
         self.clear_log_button = tk.Button(self.ut_log_frame, text="Clear log",
                                           command=self.ut_clear_log)
-        self.clear_log_button.grid(row=2, column=0, sticky="news")
-        # Apply padding to all elements
-        for child in self.user_tweets_frame.winfo_children():
-            try:
-                child.grid_configure(padx=5, pady=5)
-            except tk.TclError:
-                pass
-        
+        self.clear_log_button.grid(row=2, column=0, columnspan=2, sticky="news")
+
     def draw_tweet_id(self):
         # === tweet ID === # 
         self.tweet_id_frame.rowconfigure(0, weight=1)
@@ -301,17 +299,15 @@ class BirdbodyGUI(tk.Frame):
         self.ti_download_button.grid(row=5, column=0, columnspan=2, sticky="news")
         # Log
         ttk.Label(self.ti_log_frame, text="Log", font="verdana 12").grid(row=0, column=0, sticky="news")
-        self.ti_log_text = tk.Text(self.ti_log_frame)
+        self.ti_log_scroll = ttk.Scrollbar(self.ti_log_frame)
+        self.ti_log_text = tk.Text(self.ti_log_frame, yscrollcommand=self.ut_log_scroll.set)
+        self.ti_log_scroll.configure(command=self.ti_log_text.yview)
         self.ti_log_text.grid(row=1, column=0, sticky="news")
+        self.ti_log_scroll.grid(row=1, column=1, sticky="news")
         self.clear_log_button = tk.Button(self.ti_log_frame, text="Clear log",
                                           command=self.ti_clear_log)
-        self.clear_log_button.grid(row=2, column=0, sticky="news")
-        # Apply padding to all elements
-        for child in self.tweet_id_frame.winfo_children():
-            try:
-                child.grid_configure(padx=5, pady=5)
-            except tk.TclError:
-                pass
+        self.clear_log_button.grid(row=2, column=0, columnspan=2, sticky="news")
+
 
 
     def draw_file_management(self):
@@ -345,11 +341,6 @@ class BirdbodyGUI(tk.Frame):
         self.convert_to_txt_button.grid(row=4, column=2, sticky="new")
         self.save_tweet_ids_button.grid(row=5, column=2, sticky="new")
         self.file_list_dirty = True # to check if refresh is needed, e.g. after adding file
-        for child in self.file_frame.winfo_children():
-            try:
-                child.grid_configure(padx=5, pady=5)
-            except tk.TclError:
-                pass
 
 
     def draw_settings(self):
@@ -407,11 +398,7 @@ class BirdbodyGUI(tk.Frame):
         self.save_data_path_button.grid(row=6, column=0, columnspan=6, sticky="news")
         self.browse_data_path_button.grid(row=5, column=4, columnspan=1, sticky="news")
 
-        for child in self.settings_frame.winfo_children():
-            try:
-                child.grid_configure(padx=5, pady=5)
-            except tk.TclError:
-                pass
+
 
 
     def help_with_credentials(self):
@@ -683,9 +670,9 @@ class BirdbodyGUI(tk.Frame):
             self.ut_download_button.configure(text="Download tweets", state="disabled")
             self.ut_conn, worker_conn = mp.Pipe()
             self.ut_worker_proc = mp.Process(target=bbwork.grab_tweets_from_users, args=(udp, ck, 
-                                                                                        cs, ak, acs,
-                                                                                        screen_names,
-                                                                                        worker_conn))
+                                                                                         cs, ak, acs,
+                                                                                         screen_names,
+                                                                                         worker_conn))
             self.ut_worker_proc.start()
             self.root.update()
             self.root.after(250, self.check_ut_download_status)
@@ -696,8 +683,8 @@ class BirdbodyGUI(tk.Frame):
         udp = self.data_path_var.get().strip()
         dn = os.path.join(udp, "tweets", "csv")
         fp = os.path.join(dn, "*.csv")
-        for f in glob.iglob(fp):
-            fn = os.path.basename(f)
+        fn_list = [os.path.basename(f) for f in glob.iglob(fp)]
+        for fn in sorted(fn_list):
             self.csv_listbox.insert("end", fn)
 
     def tab_change(self, event):
