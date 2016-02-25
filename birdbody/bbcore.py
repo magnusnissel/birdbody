@@ -106,6 +106,14 @@ class BirdbodyGUI(tk.Frame):
         self.st_max_tweets_spin.grid(row=2, column=1, sticky="news")
         self.st_filename_entry.grid(row=5, column=0, columnspan=2, sticky="news")
         self.start_stream_button.grid(row=6, column=0, columnspan=2, sticky="news")
+        self.st_convert_json_button = tk.Button(self.st_main_frame,
+                                                text="Convert JSON file to CSV", 
+                                                command=self.convert_any_json_to_csv)
+        self.st_convert_json_button.grid(row=7, column=0, columnspan=2, sticky="news")
+        ttk.Label(self.st_main_frame, text="Conversion to CSV follows streaming, but can be started manually if necessary.",
+                                            font="verdana 8").grid(row=8, column=0, columnspan=2,
+                                                                    sticky="news")
+        
 
         ttk.Label(self.st_log_frame, text="Log", font="verdana 12").grid(row=0, column=0,
                   sticky="news")
@@ -162,6 +170,30 @@ class BirdbodyGUI(tk.Frame):
             self.st_worker_proc.terminate()
             self.check_streaming_status()
 
+    def convert_any_json_to_csv(self):
+        udp = self.data_path_var.get().strip()
+        options = {}
+        options['defaultextension'] = '.json'
+        options['filetypes'] = [('JSON file', '.json')]
+        options['initialdir'] = os.path.join(udp, "tweets", "json")
+        options['parent'] = self.root
+        options['title'] = 'Load JSON file for CSV conversion'
+        
+        filepath = tk.filedialog.askopenfilename(**options)
+        if filepath:
+            csv_dir = os.path.join(udp, "tweets", "csv")
+            fn = os.path.basename(filepath)
+            csv_path = os.path.join(csv_dir, fn.replace(".json", ".csv").replace(".JSON", ".csvs"))
+            msg = "File converted to CSV and saved as {}".format(csv_path)
+            self.update_status(msg, ts=True)
+            with open(filepath, "r", encoding="utf-8") as handler:
+                data_lines = handler.readlines()
+                tweets = bbwork.tweets_to_dict_list(data_lines, from_json=True)
+                if HAS_PANDAS:
+                    bbwork.pd_dict_list_to_csv(tweets, csv_path)
+                else:
+                    bbwork.dict_list_to_csv(tweets, csv_path)
+                self.file_list_dirty = True
 
     def convert_json_to_csv(self, dn, fn):
         """
@@ -171,7 +203,8 @@ class BirdbodyGUI(tk.Frame):
         """
         msg = "Started conversion from JSON to CSV ..."
         self.update_status(msg, ts=True)
-        self.st_write_to_log(msg, ts=True)
+        if to_log:
+            self.st_write_to_log(msg, ts=True)
         json_dir = os.path.join(dn, "tweets", "json")
         json_path = os.path.join(json_dir, "{}.json".format(fn))
         csv_dir = os.path.join(dn, "tweets", "csv")
@@ -194,7 +227,7 @@ class BirdbodyGUI(tk.Frame):
                 msg = "Tweets converted to CSV and saved as {}".format(csv_path)
                 self.update_status(msg, ts=True)
                 self.st_write_to_log(msg, ts=True)
-
+               
 
     def check_streaming_status(self):
         if not self.st_worker_proc.is_alive():
@@ -279,7 +312,6 @@ class BirdbodyGUI(tk.Frame):
         self.ti_log_frame.rowconfigure(1, weight=1)
         self.ti_log_frame.columnconfigure(0, weight=1)
         self.ti_log_frame.grid(row=0, column=1, sticky="news")
-        
         ttk.Label(self.ti_main_frame, font="verdana 12",
                  text="Insert Tweet IDs below (one per line)").grid(row=0, column=0, sticky="news")
         self.tweet_ids_text = tk.Text(self.ti_main_frame)
@@ -679,6 +711,7 @@ class BirdbodyGUI(tk.Frame):
 
             
     def update_csv_file_list(self):
+        print("updating...")
         self.csv_listbox.delete(0, "end")
         udp = self.data_path_var.get().strip()
         dn = os.path.join(udp, "tweets", "csv")
@@ -686,10 +719,11 @@ class BirdbodyGUI(tk.Frame):
         fn_list = [os.path.basename(f) for f in glob.iglob(fp)]
         for fn in sorted(fn_list):
             self.csv_listbox.insert("end", fn)
+        self.file_list_dirty = False
 
     def tab_change(self, event):
         self.tab_index = self.book.index(self.book.select())
-        if self.tab_index == 1 and self.file_list_dirty:
+        if self.tab_index == 3 and self.file_list_dirty:
             self.update_csv_file_list()
 
     def check_ti_download_status(self):
