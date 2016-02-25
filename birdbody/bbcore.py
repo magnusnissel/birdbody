@@ -362,18 +362,26 @@ class BirdbodyGUI(tk.Frame):
         self.combine_csv_var = tk.StringVar()
         self.combine_csv_entry = ttk.Entry(self.file_frame,
                                            textvariable=self.combine_csv_var, width=30)
+
         self.save_tweet_ids_button = tk.Button(self.file_frame, 
                                                  text="Export list of Tweet IDs",
                                                  command=self.save_tweet_ids)
-        self.csv_listbox.grid(row=2, column=0, sticky="news", rowspan=4)
-        self.csv_scroll.grid(row=2, column=1, sticky="ns", rowspan=4)
+        self.csv_listbox.grid(row=2, column=0, sticky="news", rowspan=5)
+        self.csv_scroll.grid(row=2, column=1, sticky="ns", rowspan=5)
         self.combine_csv_button.grid(row=2, column=2, sticky="new")
         self.combine_csv_entry.grid(row=2, column=3, sticky="new")
         self.convert_to_xml_button.grid(row=3, column=2, sticky="new")
         self.convert_to_txt_button.grid(row=4, column=2, sticky="new")
         self.save_tweet_ids_button.grid(row=5, column=2, sticky="new")
+        self.open_csv_dir_button = tk.Button(self.file_frame, text="Open CSV folder",
+                                            command=self.open_csv_dir)
+        self.open_csv_dir_button.grid(row=6, column=2, sticky="new")
         self.file_list_dirty = True # to check if refresh is needed, e.g. after adding file
 
+    def open_csv_dir(self):
+        udp = self.data_path_var.get().strip()
+        dn = os.path.join(udp, "tweets", "csv")
+        bbwork.open_file_externally(dn)
 
     def draw_settings(self):
         # --- settings --- #
@@ -745,7 +753,6 @@ class BirdbodyGUI(tk.Frame):
             self.root.update_idletasks()
             self.root.after(250, self.check_ti_download_status)
 
-
     def check_ut_download_status(self):
         if not self.ut_worker_proc.is_alive():
             self.ut_worker_proc.join()
@@ -794,7 +801,6 @@ class BirdbodyGUI(tk.Frame):
             text = "{} ({})".format(text, now)
         self.st_log_text.insert("end", text)
         self.st_log_text.insert("end", "\n")
-
 
     def save_data_path(self):
         udp = self.data_path_var.get().strip()

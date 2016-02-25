@@ -3,6 +3,8 @@ import datetime
 import csv
 import tweepy
 import json
+import platform
+import subprocess
 
 HAS_PANDAS = True
 try:
@@ -10,6 +12,14 @@ try:
 except ImportError:
     HAS_PANDAS = False
 
+
+def open_file_externally(path):
+    if platform.system() == "Windows":
+        os.startfile(path)
+    elif platform.system() == "Darwin":
+        subprocess.Popen(["open", path])
+    else:
+        subprocess.Popen(["xdg-open", path])
 
 class BirdBodyListener(tweepy.StreamListener):
     """ 
@@ -30,7 +40,7 @@ class BirdBodyListener(tweepy.StreamListener):
             handler.write(data)
         self.num_tweets += 1
         m = self.num_tweets % 25  # notify every 25 tweets
-        if m == 0 and self.num_tweets > 0:
+        if (m == 0 or self.num_tweets <11) and self.num_tweets > 0:
             if self.max_tweets > 0:
                 msg = "Collected {}/{} tweets so far.".format(self.num_tweets, self.max_tweets)
             else:
