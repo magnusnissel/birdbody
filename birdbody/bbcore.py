@@ -113,8 +113,6 @@ class BirdbodyGUI(tk.Frame):
         ttk.Label(self.st_main_frame, text="Conversion to CSV follows streaming, but can be started manually if necessary.",
                                             font="verdana 8").grid(row=8, column=0, columnspan=2,
                                                                     sticky="news")
-        
-
         ttk.Label(self.st_log_frame, text="Log", font="verdana 12").grid(row=0, column=0,
                   sticky="news")
         self.st_log_scroll = ttk.Scrollbar(self.st_log_frame)
@@ -125,7 +123,6 @@ class BirdbodyGUI(tk.Frame):
         self.clear_log_button = tk.Button(self.st_log_frame, text="Clear log",
                                           command=self.st_clear_log)
         self.clear_log_button.grid(row=2, column=0, columnspan=2, sticky="news")
-
         
 
     def start_streaming(self, fn=None):
@@ -161,14 +158,24 @@ class BirdbodyGUI(tk.Frame):
                                                                                     worker_conn))
                 self.st_worker_proc.start()
                 self.root.update()
-                self.root.after(250, self.check_streaming_status)
+                self.st_after = self.root.after(250, self.check_streaming_status)
         else:
             msg = "Stopping ..."
             self.update_status(msg, ts=True)
             self.st_write_to_log(msg, ts=True)
             self.root.update()
+            self.root.after_cancel(self.st_after)
             self.st_worker_proc.terminate()
-            self.check_streaming_status()
+            self.st_worker_proc.join()
+            udp = self.data_path_var.get().strip()
+            dn = os.path.join(udp, "tweets", "json")
+            msg = "Done streaming tweets.\nRaw JSON saved to {}".format(dn)
+            self.file_list_dirty = True
+            self.update_status(msg, ts=True)
+            self.st_write_to_log(msg, ts=True)
+            self.convert_json_to_csv(udp, self.stream_fn)
+            self.start_stream_button.configure(text="Start streaming")
+            self.root.update_idletasks()
 
     def convert_any_json_to_csv(self):
         udp = self.data_path_var.get().strip()
@@ -178,7 +185,6 @@ class BirdbodyGUI(tk.Frame):
         options['initialdir'] = os.path.join(udp, "tweets", "json")
         options['parent'] = self.root
         options['title'] = 'Load JSON file for CSV conversion'
-        
         filepath = tk.filedialog.askopenfilename(**options)
         if filepath:
             csv_dir = os.path.join(udp, "tweets", "csv")
@@ -203,8 +209,7 @@ class BirdbodyGUI(tk.Frame):
         """
         msg = "Started conversion from JSON to CSV ..."
         self.update_status(msg, ts=True)
-        if to_log:
-            self.st_write_to_log(msg, ts=True)
+        self.st_write_to_log(msg, ts=True)
         json_dir = os.path.join(dn, "tweets", "json")
         json_path = os.path.join(json_dir, "{}.json".format(fn))
         csv_dir = os.path.join(dn, "tweets", "csv")
@@ -227,7 +232,6 @@ class BirdbodyGUI(tk.Frame):
                 msg = "Tweets converted to CSV and saved as {}".format(csv_path)
                 self.update_status(msg, ts=True)
                 self.st_write_to_log(msg, ts=True)
-               
 
     def check_streaming_status(self):
         if not self.st_worker_proc.is_alive():
@@ -247,7 +251,7 @@ class BirdbodyGUI(tk.Frame):
                 self.update_status(msg, ts=True)
                 self.st_write_to_log(msg, ts=True)
             self.root.update_idletasks()
-            self.root.after(250, self.check_streaming_status)
+            self.st_after = self.root.after(250, self.check_streaming_status)
 
     def draw_user_tweets(self):
         self.user_tweets_frame.rowconfigure(0, weight=1)
@@ -341,10 +345,15 @@ class BirdbodyGUI(tk.Frame):
         self.clear_log_button.grid(row=2, column=0, columnspan=2, sticky="news")
 
 
-
     def draw_file_management(self):
         #=== File management frame ===#
-        self.file_frame.rowconfigure(2, weight=1)
+        self.file_frame.rowconfigure(1, weight=0)
+        self.file_frame.rowconfigure(2, weight=0)
+        self.file_frame.rowconfigure(3, weight=0)
+        self.file_frame.rowconfigure(4, weight=0)
+        self.file_frame.rowconfigure(5, weight=0)
+        self.file_frame.rowconfigure(6, weight=1)
+        
         ttk.Label(self.file_frame, font="verdana 12",
                  text="Combine CSV files or export to XML / plaintext").grid(row=0, column=0, 
                                                                  sticky="news")
@@ -416,7 +425,6 @@ class BirdbodyGUI(tk.Frame):
         self.save_credentials_button = ttk.Button(self.settings_frame,
                                                   text="Store credentials", 
                                                   command=self.save_credentials)
-        
         self.consumer_key_entry.grid(row=2, column=1, sticky="news")
         self.consumer_secret_entry.grid(row=2, column=4, sticky="news")
         self.access_key_entry.grid(row=3, column=1, sticky="news")
@@ -427,16 +435,17 @@ class BirdbodyGUI(tk.Frame):
         self.data_path_entry = ttk.Entry(self.settings_frame,
                                          textvariable=self.data_path_var, width=50)
         ttk.Label(self.settings_frame, text="Data path",
-                  font="verdana 10").grid(row=5, column=0, sticky="news")
+                  font="verdana 10").grid(row=6, column=0, sticky="news")
         self.browse_data_path_button = ttk.Button(self.settings_frame,
                                                   text="Browse", 
                                                   command=self.browse_data_path)
         self.save_data_path_button = ttk.Button(self.settings_frame,
                                                 text="Store data path", 
                                                 command=self.save_data_path)
-        self.data_path_entry.grid(row=5, column=1, columnspan=3, sticky="news")
-        self.save_data_path_button.grid(row=6, column=0, columnspan=6, sticky="news")
-        self.browse_data_path_button.grid(row=5, column=4, columnspan=1, sticky="news")
+        self.data_path_entry.grid(row=6, column=1, columnspan=3, sticky="news")
+        self.save_data_path_button.grid(row=7, column=0, columnspan=6, sticky="news")
+        self.browse_data_path_button.grid(row=6, column=4, columnspan=1, sticky="news")
+        self.credentials_help_button.grid(row=5, column=0, columnspan=6, sticky="news")
 
 
 
@@ -719,7 +728,6 @@ class BirdbodyGUI(tk.Frame):
 
             
     def update_csv_file_list(self):
-        print("updating...")
         self.csv_listbox.delete(0, "end")
         udp = self.data_path_var.get().strip()
         dn = os.path.join(udp, "tweets", "csv")
