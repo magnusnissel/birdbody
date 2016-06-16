@@ -84,3 +84,9 @@ How to use the Windows release:
  
  ## LICENSE ##
 GNU General Public License Version 3 (or later). See LICENSE file for more information.
+
+## Citation ##
+If you end up using Birdbody for published research, I would appreciate a reference along the lines of
+
+Nissel, Magnus. 2016. Birdbody. Software (GPL). https://github.com/magnusnissel/birdbody
+
