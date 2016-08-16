@@ -1,6 +1,9 @@
 [![DOI](https://zenodo.org/badge/23260/magnusnissel/birdbody.svg)](https://zenodo.org/badge/latestdoi/23260/magnusnissel/birdbody)
 
-# birdbody
+# Birdbody
+![Birdbody logo](https://github.com/magnusnissel/birdbody/blob/master/assets/birdbody_fb_profile.png)
+
+
 A graphical interface for creating twitter corpora. It can gather the most recent tweets of specified users. It is also able download tweets from a list of Tweet IDs (and generate this list for downloaded tweets). Finally, it can also collect tweets from the Twitter live stream over a period of time.
 
 Originally based on the tweet_dumper.py gist by Yanofsky (https://gist.github.com/yanofsky/5436496).
