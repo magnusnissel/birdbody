@@ -1,3 +1,5 @@
+[![DOI](https://zenodo.org/badge/23260/magnusnissel/birdbody.svg)](https://zenodo.org/badge/latestdoi/23260/magnusnissel/birdbody)
+
 # birdbody
 A graphical interface for creating twitter corpora. It can gather the most recent tweets of specified users. It is also able download tweets from a list of Tweet IDs (and generate this list for downloaded tweets). Finally, it can also collect tweets from the Twitter live stream over a period of time.
 
@@ -106,8 +108,21 @@ GNU General Public License Version 3 (or later). See LICENSE file for more infor
 - added some 401 error explanations
 - changed structure from package to simple script
 
-## Citation
-If you end up using Birdbody for published research, I would appreciate a reference along the lines of
+# Citing Birdbody
 
-Nissel, Magnus. 2016. Birdbody. Software (GPL). https://github.com/magnusnissel/birdbody
+If you end up using Birdbody for published research, I would appreciate a reference. For version 1.0.0 (codename Albatross) this could look like
 
+
+Nissel, Magnus. 2016. Birdbody 1.0.0 (Albatross). Zenodo. 10.5281/zenodo.60307
+
+
+Here is a BibTex entry suggestion
+```
+@misc{magnus_nissel_2016_60307,
+  author       = {Magnus Nissel},
+  title        = {Birdbody 1.0.0 (Albatross)},
+  year         = 2016,
+  doi          = {10.5281/zenodo.60307},
+  url          = {http://dx.doi.org/10.5281/zenodo.60307}
+}
+```
