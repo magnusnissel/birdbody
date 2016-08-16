@@ -68,18 +68,11 @@ Twitter does not allow you to distribute the actual text corpus, but you can sha
   * tweepy
 
 ## Windows
-An folder with an executable of birdbody for Windows can be downloaded here:
-
-http://www.u203d.net/birdbody.zip
+A  Windows (64bit) executable is now available.
 
 Please note that I can not guarantee that the Windows binary will always be up to date, but I will do my best to update it
-whenever something import happens in this repository. 
+whenever something important happens in this repository. 
 
-How to use the Windows release:
-
- * Unzip the birdbody.zip folder
- * Execute birdbody.exe
- 
 ## Known issues 
 Especially under Windows there are still issues when switching windows (or tabs inside Birdbody) during complex operations. 
 Sometimes waiting will resolve this, but it can also crash the app. Until I know how to fix this I suggest minimal
