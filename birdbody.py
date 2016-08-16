@@ -1,13 +1,11 @@
-"""
-I doubt that's the best way to do this, but this script allows me to debug the package without
-building and installing it first. If I try to use the normal entry point ("__main__.py") the
-absolute imports don't work (if package not installed) or use the old installed version of
-the package
-"""
+import tkinter as tk
+import multiprocessing as mp
+from core import BirdbodyGUI
 
-from multiprocessing import freeze_support
-from birdbody import bbstart
+def main():
+    root = tk.Tk()
+    BirdbodyGUI(root)
 
-if __name__ == "__main__":
-        freeze_support()
-        bbstart.main()
+if __name__ == '__main__':
+    mp.freeze_support()
+    main()

@@ -1,4 +1,5 @@
 import os
+import sys
 import glob
 import datetime
 import tkinter as tk
@@ -10,12 +11,7 @@ import json
 import csv
 import configparser
 import webbrowser
-import appdirs
-from xml.etree import ElementTree as etree
-try:
-    import bbwork
-except ImportError:
-    import birdbody.bbwork as bbwork
+import worker
 HAS_PANDAS = True
 try:
     import pandas as pd
@@ -28,13 +24,14 @@ class BirdbodyGUI(tk.Frame):
     def __init__(self, root):
         tk.Frame.__init__(self)
         self.root = root
-        self.default_data_path = appdirs.user_data_dir("birdbody", "u203d")
+        self.script_path = os.path.dirname(os.path.realpath(sys.argv[0]))
+        self.default_data_path = os.path.join(self.script_path, "user_data")
         try:
             os.makedirs(self.default_data_path)
         except OSError as e:
             if e.errno != 17:
                 raise()
-        self.config_path = os.path.join(self.default_data_path, "config.ini")
+        self.config_path = os.path.join(self.default_data_path, "settings.ini")
         self.draw_ui()
         self.check_config()
         self.root.mainloop()
@@ -151,7 +148,7 @@ class BirdbodyGUI(tk.Frame):
                     fn = "tweets_from_stream_{}".format(now_str) # no ext, .json and .csv used
                 self.stream_fn = fn  # needed to convert json to csv after proc done
                 self.st_conn, worker_conn = mp.Pipe()
-                self.st_worker_proc = mp.Process(target=bbwork.stream_tweets, args=(udp, fn, ck, cs, 
+                self.st_worker_proc = mp.Process(target=worker.stream_tweets, args=(udp, fn, ck, cs, 
                                                                                     ak, acs,
                                                                                     search_str_list,
                                                                                     max_tweets,
@@ -194,11 +191,11 @@ class BirdbodyGUI(tk.Frame):
             self.update_status(msg, ts=True)
             with open(filepath, "r", encoding="utf-8") as handler:
                 data_lines = handler.readlines()
-                tweets = bbwork.tweets_to_dict_list(data_lines, from_json=True)
+                tweets = worker.tweets_to_dict_list(data_lines, from_json=True)
                 if HAS_PANDAS:
-                    bbwork.pd_dict_list_to_csv(tweets, csv_path)
+                    worker.pd_dict_list_to_csv(tweets, csv_path)
                 else:
-                    bbwork.dict_list_to_csv(tweets, csv_path)
+                    worker.dict_list_to_csv(tweets, csv_path)
                 self.file_list_dirty = True
 
     def convert_json_to_csv(self, dn, fn):
@@ -221,14 +218,14 @@ class BirdbodyGUI(tk.Frame):
         csv_path = os.path.join(csv_dir, "{}.csv".format(fn))
         with open(json_path, "r", encoding="utf-8") as handler:
             data_lines = handler.readlines()
-            tweets = bbwork.tweets_to_dict_list(data_lines, from_json=True)
+            tweets = worker.tweets_to_dict_list(data_lines, from_json=True)
             if HAS_PANDAS:
-                bbwork.pd_dict_list_to_csv(tweets, csv_path)
+                worker.pd_dict_list_to_csv(tweets, csv_path)
                 msg = "Tweets converted to CSV and saved as {}".format(csv_path)
                 self.update_status(msg, ts=True)
                 self.st_write_to_log(msg, ts=True)
             else:
-                bbwork.dict_list_to_csv(tweets, csv_path)
+                worker.dict_list_to_csv(tweets, csv_path)
                 msg = "Tweets converted to CSV and saved as {}".format(csv_path)
                 self.update_status(msg, ts=True)
                 self.st_write_to_log(msg, ts=True)
@@ -390,7 +387,7 @@ class BirdbodyGUI(tk.Frame):
     def open_csv_dir(self):
         udp = self.data_path_var.get().strip()
         dn = os.path.join(udp, "tweets", "csv")
-        bbwork.open_file_externally(dn)
+        worker.open_file_externally(dn)
 
     def draw_settings(self):
         # --- settings --- #
@@ -442,9 +439,10 @@ class BirdbodyGUI(tk.Frame):
         self.save_data_path_button = ttk.Button(self.settings_frame,
                                                 text="Store data path", 
                                                 command=self.save_data_path)
-        self.data_path_entry.grid(row=6, column=1, columnspan=3, sticky="news")
-        self.save_data_path_button.grid(row=7, column=0, columnspan=6, sticky="news")
-        self.browse_data_path_button.grid(row=6, column=4, columnspan=1, sticky="news")
+        self.data_path_entry.grid(row=6, column=1, columnspan=5, sticky="news")
+        self.data_path_entry["state"] = "disabled"
+        #self.save_data_path_button.grid(row=7, column=0, columnspan=6, sticky="news")
+        #self.browse_data_path_button.grid(row=6, column=4, columnspan=1, sticky="news")
         self.credentials_help_button.grid(row=5, column=0, columnspan=6, sticky="news")
 
 
@@ -690,7 +688,7 @@ class BirdbodyGUI(tk.Frame):
             
             self.ti_download_button.configure(text="Download tweets", state="disabled")
             self.ti_conn, worker_conn = mp.Pipe()
-            self.ti_worker_proc = mp.Process(target=bbwork.grab_tweets_by_ids, args=(udp, ck, cs,
+            self.ti_worker_proc = mp.Process(target=worker.grab_tweets_by_ids, args=(udp, ck, cs,
                                                                                      ak, acs, 
                                                                                      tweet_ids,
                                                                                      cfn,
@@ -718,7 +716,7 @@ class BirdbodyGUI(tk.Frame):
             acs = self.access_secret_var.get().strip()
             self.ut_download_button.configure(text="Download tweets", state="disabled")
             self.ut_conn, worker_conn = mp.Pipe()
-            self.ut_worker_proc = mp.Process(target=bbwork.grab_tweets_from_users, args=(udp, ck, 
+            self.ut_worker_proc = mp.Process(target=worker.grab_tweets_from_users, args=(udp, ck, 
                                                                                          cs, ak, acs,
                                                                                          screen_names,
                                                                                          worker_conn))
@@ -785,6 +783,8 @@ class BirdbodyGUI(tk.Frame):
         if ts:
             now = datetime.datetime.now().isoformat()[:19].replace("T"," ")
             text = "{} ({})".format(text, now)
+            if "401" in text:
+                text = "Twitter Error 401: see https://dev.twitter.com/overview/api/response-codes for more information. ({})".format(now)
         self.status_var.set(text)
         if color:
             self.status_bar.config(foreground=color)
@@ -793,6 +793,8 @@ class BirdbodyGUI(tk.Frame):
         if ts:
             now = datetime.datetime.now().isoformat()[:19].replace("T"," ")
             text = "{} ({})".format(text, now)
+            if "401" in text:
+                text = "Twitter Error 401: see https://dev.twitter.com/overview/api/response-codes for more information. ({})".format(now)
         self.ut_log_text.insert("end", text)
         self.ut_log_text.insert("end", "\n")
 
@@ -800,6 +802,9 @@ class BirdbodyGUI(tk.Frame):
         if ts:
             now = datetime.datetime.now().isoformat()[:19].replace("T"," ")
             text = "{} ({})".format(text, now)
+            text = "{} ({})".format(text, now)
+            if "401" in text:
+                text = "Twitter Error 401: see https://dev.twitter.com/overview/api/response-codes for more information. ({})".format(now)
         self.ti_log_text.insert("end", text)
         self.ti_log_text.insert("end", "\n")
 
@@ -807,6 +812,8 @@ class BirdbodyGUI(tk.Frame):
         if ts:
             now = datetime.datetime.now().isoformat()[:19].replace("T"," ")
             text = "{} ({})".format(text, now)
+            if "401" in text:
+                text = "Twitter Error 401: see https://dev.twitter.com/overview/api/response-codes for more information. ({})".format(now)
         self.st_log_text.insert("end", text)
         self.st_log_text.insert("end", "\n")
 
@@ -877,6 +884,8 @@ class BirdbodyGUI(tk.Frame):
             self.access_secret_var.set(acs)
         if udp:
             self.data_path_var.set(udp)
+        else:
+            self.data_path_var.set(os.path.join(self.script_path, "user_data"))
 
 
     def book_tab_change(self, event):

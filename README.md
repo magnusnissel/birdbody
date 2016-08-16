@@ -1,5 +1,5 @@
 # birdbody
-A graphical interface for creating twitter corpora. Still very much a work in progress. It currently gathers the most recent tweets of specified users. It can also download tweets from a list of Tweet IDs (and generate this list for downloaded tweets). Finally, it can also collect tweets from the Twitter live stream over a period of time.
+A graphical interface for creating twitter corpora. It can gather the most recent tweets of specified users. It is also able download tweets from a list of Tweet IDs (and generate this list for downloaded tweets). Finally, it can also collect tweets from the Twitter live stream over a period of time.
 
 Originally based on the tweet_dumper.py gist by Yanofsky (https://gist.github.com/yanofsky/5436496).
 
