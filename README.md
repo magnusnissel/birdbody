@@ -3,10 +3,10 @@ A graphical interface for creating twitter corpora. It can gather the most recen
 
 Originally based on the tweet_dumper.py gist by Yanofsky (https://gist.github.com/yanofsky/5436496).
 
-## Usage notes ##
+## Usage notes
 You can easily create your own multi-user corpus in CSV, XML and TXT format using the steps outlined below.
 
-### Initial setup ###
+### Initial setup
 In order to use birdbody you need to first create a Twitter app through https://apps.twitter.com.
 This allows you to generate the four credentials required to access the Twitter API:
  
@@ -17,7 +17,7 @@ This allows you to generate the four credentials required to access the Twitter 
 
 Add these in the "Settings" tab.
 
-### Downloading tweets from users ###
+### Downloading tweets from users
 Birdbody can download as many recent tweets of a user as Twitter allows (around 3000).
 
 1. Go to "Tweets by users" tab.
@@ -27,7 +27,7 @@ Birdbody can download as many recent tweets of a user as Twitter allows (around 
 6. Open the .csv files with the program of your choice
 7. If you want XML or plaintext files for use with concordancers, see "Conversion" below
 
-### Streaming tweets ###
+### Streaming tweets
 Birdbody can listen to the Twitter stream and collect tweets matching search strings.
 
 1. Go to the "Stream tweets" tab.
@@ -38,7 +38,7 @@ Birdbody can listen to the Twitter stream and collect tweets matching search str
 
 There is a button for JSON-to-CSV conversion in streaming does not stop regularly. This could happen if the software or computer crashes / shuts down during long streaming sessions.
 
-### Creating corpora ###
+### Creating corpora
 You can aggregate the CSV files to create larger collections.
 
 1. Go to the "File management" tab.
@@ -55,7 +55,7 @@ You can convert the CSV files into plaintext (just the tweet texts separated by 
 3. Click on "Convert to .xml" or "Convert to .txt" and wait.
 4. The files are stored in the tweets/xml or tweets/txt folders within your user data folder. 
 
-### Sharing corpora ###
+### Sharing corpora
 Twitter does not allow you to distribute the actual text corpus, but you can share all relevant Tweet IDs so that other people can recreate the corpus by downloading the tweets themselves (see "Tweets by ID" tab).
 
 1. Go to the "File management" tab.
@@ -63,13 +63,11 @@ Twitter does not allow you to distribute the actual text corpus, but you can sha
 3. Click on "Export list of Tweet IDs"
 4. The ID list(s) will appear in the "tweet_ids" folder inside your data folder.
 
-## Requirements ##
+## Requirements
   * Python 3
   * tweepy
-  * appdirs (included as a private copy)
 
-
-## Windows ##
+## Windows
 An folder with an executable of birdbody for Windows can be downloaded here:
 
 http://www.u203d.net/birdbody.zip
@@ -82,10 +80,40 @@ How to use the Windows release:
  * Unzip the birdbody.zip folder
  * Execute birdbody.exe
  
- ## LICENSE ##
+## Known issues 
+Especially under Windows there are still issues when switching windows (or tabs inside Birdbody) during complex operations. 
+Sometimes waiting will resolve this, but it can also crash the app. Until I know how to fix this I suggest minimal
+interface interactions while downloading/streaming tweets or converting files.
+This seems to occur more frequently with the Windows binary than with the Python script, but I have only anecdotal evidence.
+
+## Troubleshooting
+
+### 401
+If you receive a 401 error, the most common cause is that your authentication __credentials are incorrect__. However, I have also seen that error 
+while __streaming tweets__ when my computer's __local time was off__. So if "Tweets by users" still works, but streaming doesn't, then check the time settings
+of your operating system.
+
+## 403, 420, 429
+These errors can occur due to __rate limiting__. While Birdbody uses [tweepy's feature to sleep automatically when rate limited](http://docs.tweepy.org/en/v3.2.0/api.html#API) 
+it is still possible to get theses errors because you are requesting too much data from Twitter at too fast a pace. There are a number of ways to avoid this including
+working with several smaller lists of users/keywords instead of a single large one or by limiting the number of tweets gathered. However, in normal situations you simply
+need to wait until you are no longer rate limited and often tweepy/Birdbody will do this automatically for you.
+
+## More information 
+[Official Twitter error code documentation](https://dev.twitter.com/overview/api/response-codes)
+
+## LICENSE
 GNU General Public License Version 3 (or later). See LICENSE file for more information.
 
-## Citation ##
+## Changelog
+
+### 2016-08-16
+- removed appdirs dependency and switched to "user_data" inside the Birdbody folder as the data directory
+- removed custom users paths
+- added some 401 error explanations
+- changed structure from package to simple script
+
+## Citation
 If you end up using Birdbody for published research, I would appreciate a reference along the lines of
 
 Nissel, Magnus. 2016. Birdbody. Software (GPL). https://github.com/magnusnissel/birdbody
