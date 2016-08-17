@@ -36,7 +36,7 @@ Nissel, Magnus. 2016. Birdbody 1.0.2 (Albatross). https://github.com/magnusnisse
 
 Here is a BibTex entry suggestion
 ```
-@misc{magnus_nissel_2016_60307,
+@misc{magnus_nissel_2016,
   author       = {Magnus Nissel},
   title        = {Birdbody 1.0.2 (Albatross)},
   year         = 2016,
