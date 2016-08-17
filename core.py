@@ -740,7 +740,7 @@ class BirdbodyGUI(tk.Frame):
             self.ut_download_button.configure(text="Download tweets", state="disabled")
             self.ut_conn, worker_conn = mp.Pipe(duplex=False)
             self.ut_worker_proc = mp.Process(target=worker.grab_tweets_from_users, args=(udp, ck, cs,
-                                                                                         screen_names,
+                                                                                         screen_names, 0,
                                                                                          worker_conn))
             self.ut_worker_proc.start()
             self.root.after(1000, self.check_ut_download_status)
@@ -895,7 +895,10 @@ class BirdbodyGUI(tk.Frame):
         cs = self.config['Credentials']['CustomerSecret'].strip()
         ak = self.config['Credentials']['AccessKey'].strip()
         acs = self.config['Credentials']['AccessSecret'].strip()
-        udp = self.config['Path']['UserDataPath'].strip()
+        try:
+            udp = self.config['Path']['UserDataPath'].strip()
+        except KeyError:
+            udp = self.default_data_path
         if ck:
             self.consumer_key_var.set(ck)
         if cs:
