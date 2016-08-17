@@ -40,7 +40,7 @@ Here is a BibTex entry suggestion
   author       = {Magnus Nissel},
   title        = {Birdbody 1.0.2 (Albatross)},
   year         = 2016,
-  url          = {https://github.com/magnusnissel/birdbody/releases/tag/v1.0.2}
+  url          = {https://github.com/magnusnissel/birdbody}
 }
 ```
 
