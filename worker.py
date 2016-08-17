@@ -39,8 +39,7 @@ class BirdBodyListener(tweepy.StreamListener):
         with open(self.json_path,'a', encoding="utf-8") as handler:
             handler.write(data)
         self.num_tweets += 1
-        m = self.num_tweets % 25  # notify every 25 tweets
-        if (m == 0 or self.num_tweets <11) and self.num_tweets > 0:
+        if self.num_tweets % 25 == 0 or self.num_tweets in (1, 5, 10):
             if self.max_tweets > 0:
                 msg = "Collected {}/{} tweets so far.".format(self.num_tweets, self.max_tweets)
             else:

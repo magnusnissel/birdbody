@@ -12,6 +12,7 @@ import csv
 import configparser
 import webbrowser
 import worker
+from lxml import etree
 HAS_PANDAS = True
 try:
     import pandas as pd
@@ -147,32 +148,22 @@ class BirdbodyGUI(tk.Frame):
                     now_str = "".join([c if c.isalnum() else "-" for c in now_str])
                     fn = "tweets_from_stream_{}".format(now_str) # no ext, .json and .csv used
                 self.stream_fn = fn  # needed to convert json to csv after proc done
-                self.st_conn, worker_conn = mp.Pipe()
+                self.st_conn, worker_conn = mp.Pipe(duplex=False)
                 self.st_worker_proc = mp.Process(target=worker.stream_tweets, args=(udp, fn, ck, cs, 
                                                                                     ak, acs,
                                                                                     search_str_list,
                                                                                     max_tweets,
                                                                                     worker_conn))
                 self.st_worker_proc.start()
-                self.root.update()
-                self.st_after = self.root.after(250, self.check_streaming_status)
+                self.st_after = self.root.after(1000, self.check_streaming_status)
         else:
             msg = "Stopping ..."
             self.update_status(msg, ts=True)
             self.st_write_to_log(msg, ts=True)
-            self.root.update()
             self.root.after_cancel(self.st_after)
             self.st_worker_proc.terminate()
             self.st_worker_proc.join()
-            udp = self.data_path_var.get().strip()
-            dn = os.path.join(udp, "tweets", "json")
-            msg = "Done streaming tweets.\nRaw JSON saved to {}".format(dn)
-            self.file_list_dirty = True
-            self.update_status(msg, ts=True)
-            self.st_write_to_log(msg, ts=True)
-            self.convert_json_to_csv(udp, self.stream_fn)
-            self.start_stream_button.configure(text="Start streaming")
-            self.root.update_idletasks()
+            self.finish_streaming()
 
     def convert_any_json_to_csv(self):
         udp = self.data_path_var.get().strip()
@@ -187,16 +178,24 @@ class BirdbodyGUI(tk.Frame):
             csv_dir = os.path.join(udp, "tweets", "csv")
             fn = os.path.basename(filepath)
             csv_path = os.path.join(csv_dir, fn.replace(".json", ".csv").replace(".JSON", ".csvs"))
-            msg = "File converted to CSV and saved as {}".format(csv_path)
-            self.update_status(msg, ts=True)
-            with open(filepath, "r", encoding="utf-8") as handler:
-                data_lines = handler.readlines()
-                tweets = worker.tweets_to_dict_list(data_lines, from_json=True)
-                if HAS_PANDAS:
-                    worker.pd_dict_list_to_csv(tweets, csv_path)
-                else:
-                    worker.dict_list_to_csv(tweets, csv_path)
-                self.file_list_dirty = True
+            try:
+                with open(filepath, "r", encoding="utf-8") as handler:
+                    data_lines = handler.readlines()
+                    tweets = worker.tweets_to_dict_list(data_lines, from_json=True)
+                    if HAS_PANDAS:
+                        worker.pd_dict_list_to_csv(tweets, csv_path)
+                    else:
+                        worker.dict_list_to_csv(tweets, csv_path)
+                    self.file_list_dirty = True
+            except Exception as e:
+                msg = "Error converting JSON to CSV: {}".format(e)
+                color = "red"
+            else:
+                msg = "File converted to CSV and saved as {}".format(csv_path)
+                color = "green"
+            finally:
+                self.update_status(msg, ts=True, color=color)
+            
 
     def convert_json_to_csv(self, dn, fn):
         """
@@ -212,43 +211,56 @@ class BirdbodyGUI(tk.Frame):
         csv_dir = os.path.join(dn, "tweets", "csv")
         try:
             os.makedirs(csv_dir)
-        except OSError as e:
-            if e.errno != 17:
-                raise()
+        except FileExistsError:
+            pass
         csv_path = os.path.join(csv_dir, "{}.csv".format(fn))
-        with open(json_path, "r", encoding="utf-8") as handler:
-            data_lines = handler.readlines()
-            tweets = worker.tweets_to_dict_list(data_lines, from_json=True)
-            if HAS_PANDAS:
-                worker.pd_dict_list_to_csv(tweets, csv_path)
-                msg = "Tweets converted to CSV and saved as {}".format(csv_path)
-                self.update_status(msg, ts=True)
-                self.st_write_to_log(msg, ts=True)
-            else:
-                worker.dict_list_to_csv(tweets, csv_path)
-                msg = "Tweets converted to CSV and saved as {}".format(csv_path)
-                self.update_status(msg, ts=True)
-                self.st_write_to_log(msg, ts=True)
+        try:
+            with open(json_path, "r", encoding="utf-8") as handler:
+                data_lines = handler.readlines()
+                tweets = worker.tweets_to_dict_list(data_lines, from_json=True)
+                if HAS_PANDAS:
+                    worker.pd_dict_list_to_csv(tweets, csv_path)
+                else:
+                    worker.dict_list_to_csv(tweets, csv_path)
+        except Exception as e:
+            msg = "Error converting JSON to CSV: {}".format(e)
+            color = "red"
+        else:
+            msg = "{} tweets converted to CSV and saved as \n{}".format(len(tweets), csv_path)
+            color = "green"
+        finally:
+            self.update_status(msg, ts=True, color=color)
+            self.st_write_to_log(msg, ts=True)
 
-    def check_streaming_status(self):
-        if not self.st_worker_proc.is_alive():
-            self.st_worker_proc.join()
+    def finish_streaming(self):
+        if self.start_stream_button["text"] != "Start screaming":
             udp = self.data_path_var.get().strip()
             dn = os.path.join(udp, "tweets", "json")
-            msg = "Done streaming tweets.\nRaw JSON saved to {}".format(dn)
+            msg = "Done streaming tweets.\nRaw JSON saved to \n{}".format(dn)
             self.file_list_dirty = True
             self.update_status(msg, ts=True)
             self.st_write_to_log(msg, ts=True)
             self.convert_json_to_csv(udp, self.stream_fn)
             self.start_stream_button.configure(text="Start streaming")
-            self.root.update_idletasks()
+
+
+    def check_streaming_status(self):
+        if not self.st_worker_proc.is_alive():
+            self.st_worker_proc.join()
+            self.finish_streaming()
+
         else:
-            msg = self.st_conn.recv()
-            if msg:
-                self.update_status(msg, ts=True)
-                self.st_write_to_log(msg, ts=True)
-            self.root.update_idletasks()
-            self.st_after = self.root.after(250, self.check_streaming_status)
+            i = 0
+            if self.st_conn.poll():
+                try:
+                    msg = self.st_conn.recv()  
+                except EOFError:
+                    pass
+                else:
+                    self.update_status(msg, ts=True)
+                    self.st_write_to_log(msg, ts=True)
+            
+            self.st_after = self.root.after(1000, self.check_streaming_status)
 
     def draw_user_tweets(self):
         self.user_tweets_frame.rowconfigure(0, weight=1)
@@ -449,10 +461,8 @@ class BirdbodyGUI(tk.Frame):
 
 
     def help_with_credentials(self):
-        """ placeholder for feature that will help users generate their keys.
-            Not a priority as I haven't yet decided on validty of alternatively
-            hard-coding the consumer key / code which makes it easier on the user
-            to authenticate with a simple web browser + copy pin interaction
+        """ 
+        placeholder for feature that will help users generate their keys.
         """
         webbrowser.open("https://github.com/magnusnissel/birdbody/blob/master/README.md")
 
@@ -478,7 +488,7 @@ class BirdbodyGUI(tk.Frame):
                         for row in reader:
                             t_handler.write(row["TWEET_ID"])
                             t_handler.write("\n")
-            self.update_status("Tweet IDs exported to {}".format(tdn))
+            self.update_status("Tweet IDs exported to {}".format(tdn), color="green")
 
     def convert_to_txt(self):
         udp = self.data_path_var.get().strip()
@@ -504,7 +514,7 @@ class BirdbodyGUI(tk.Frame):
                             t_handler.write(row["TEXT"])
                             t_handler.write("\n\n")
                         self.update_status("Saved as {}".format(tfp))
-            self.update_status("All files converted and saved in {}".format(tdn))
+            self.update_status("All files converted and saved in {}".format(tdn), color="green")
 
 
     def convert_to_xml(self):
@@ -540,7 +550,7 @@ class BirdbodyGUI(tk.Frame):
                                 tweet.set(self.all_caps_to_camel_case(att), row[att])
                     tree.write(tfp, encoding="utf-8", xml_declaration=True,)
                     self.update_status("Saved as {}".format(tfp))
-            self.update_status("All files converted and saved in {}".format(tdn))
+            self.update_status("All files converted and saved in {}".format(tdn), color="green")
 
     @staticmethod
     def all_caps_to_camel_case(s):
@@ -687,15 +697,14 @@ class BirdbodyGUI(tk.Frame):
                 cfn = "{}.csv".format(cfn)
             
             self.ti_download_button.configure(text="Download tweets", state="disabled")
-            self.ti_conn, worker_conn = mp.Pipe()
+            self.ti_conn, worker_conn = mp.Pipe(duplex=False)
             self.ti_worker_proc = mp.Process(target=worker.grab_tweets_by_ids, args=(udp, ck, cs,
                                                                                      ak, acs, 
                                                                                      tweet_ids,
                                                                                      cfn,
                                                                                      worker_conn))
             self.ti_worker_proc.start()
-            self.root.update()
-            self.root.after(250, self.check_ti_download_status)
+            self.root.after(1000, self.check_ti_download_status)
 
 
     def ut_download_tweets(self):
@@ -707,7 +716,6 @@ class BirdbodyGUI(tk.Frame):
                 l = l.strip()
                 if l:
                     screen_names.append(l)
-            
         if screen_names:
             udp = self.data_path_var.get().strip()
             ck = self.consumer_key_var.get().strip()
@@ -715,14 +723,13 @@ class BirdbodyGUI(tk.Frame):
             ak = self.access_key_var.get().strip()
             acs = self.access_secret_var.get().strip()
             self.ut_download_button.configure(text="Download tweets", state="disabled")
-            self.ut_conn, worker_conn = mp.Pipe()
+            self.ut_conn, worker_conn = mp.Pipe(duplex=False)
             self.ut_worker_proc = mp.Process(target=worker.grab_tweets_from_users, args=(udp, ck, 
                                                                                          cs, ak, acs,
                                                                                          screen_names,
                                                                                          worker_conn))
             self.ut_worker_proc.start()
-            self.root.update()
-            self.root.after(250, self.check_ut_download_status)
+            self.root.after(1000, self.check_ut_download_status)
 
             
     def update_csv_file_list(self):
@@ -745,39 +752,41 @@ class BirdbodyGUI(tk.Frame):
             self.ti_worker_proc.join()
             udp = self.data_path_var.get().strip()
             op = os.path.join(udp, "tweets", "csv")
-            msg = "Done downloading tweets for all ids.\nTable saved to {}".format(op)
+            msg = "Done downloading tweets for all ids.\nData saved to {}".format(op)
             self.file_list_dirty = True
             self.update_status(msg, ts=True)
             self.ti_write_to_log(msg, ts=True)
             self.ut_download_button.configure(text="Download tweets", state="normal")
-            self.root.update_idletasks()
+            
         else:
-            msg = self.ti_conn.recv()
-            if msg:
+            try:
+                msg = self.ti_conn.recv()   
+            except EOFError:
+                pass
+            else:
                 self.update_status(msg, ts=True)
                 self.ti_write_to_log(msg, ts=True)
-            self.root.update_idletasks()
-            self.root.after(250, self.check_ti_download_status)
+            self.root.after(1000, self.check_ti_download_status)
 
     def check_ut_download_status(self):
         if not self.ut_worker_proc.is_alive():
             self.ut_worker_proc.join()
             udp = self.data_path_var.get().strip()
             op = os.path.join(udp, "tweets", "csv")
-            msg = "Done downloading tweets for all users.\nTable saved to {}".format(op)
+            msg = "Done downloading tweets for all users.\nData saved to {}".format(op)
             self.file_list_dirty = True
             self.update_status(msg, ts=True)
             self.write_to_log(msg, ts=True)
             self.ut_download_button.configure(text="Download tweets", state="normal")
-            self.root.update_idletasks()
-
         else:
-            msg = self.ut_conn.recv()
-            if msg:
+            try:
+                msg = self.ut_conn.recv()
+            except EOFError:
+                pass
+            else:                
                 self.update_status(msg, ts=True)
                 self.write_to_log(msg, ts=True)
-            self.root.update_idletasks()
-            self.root.after(250, self.check_ut_download_status)
+            self.root.after(1000, self.check_ut_download_status)
 
     def update_status(self, text, ts=False, color=None):
         if ts:
@@ -787,7 +796,7 @@ class BirdbodyGUI(tk.Frame):
                 text = "Twitter Error 401: see https://dev.twitter.com/overview/api/response-codes for more information. ({})".format(now)
         self.status_var.set(text)
         if color:
-            self.status_bar.config(foreground=color)
+            self.status_bar.config(background=color)
 
     def write_to_log(self, text, ts=False):
         if ts:
