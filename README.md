@@ -2,9 +2,23 @@
 ![Birdbody logo](https://github.com/magnusnissel/birdbody/blob/master/assets/birdbody_fb_profile.png)
 
 
-A graphical interface for creating twitter corpora. It can gather the most recent tweets of specified users. It is also able download tweets from a list of Tweet IDs (and generate this list for downloaded tweets). Finally, it can also collect tweets from the Twitter live stream over a period of time.
+Birdbody is a graphical interface (built on top of the tweepy module) for creating corpora of tweets. It can
 
-Originally based on the tweet_dumper.py gist by Yanofsky (https://gist.github.com/yanofsky/5436496).
+- gather the most recent tweets by specified users
+- download tweets from a list of Tweet IDs
+- collect tweets from the Twitter live stream over a period of time.
+
+Tweets are downloaded as JSON files and then converted to CSV for use with spreadsheet software (the JSON files are retained). Birdbody also allows you to
+
+- combine multiple files 
+- convert from CSV to plaintext files
+- convert from CSV to XML files with some metadata attributes
+- export a list containing all Tweet IDs from a file
+
+Twitter does not allow you to share collections of full tweets. With Birdbody it is possible to instead create a list of Tweet IDs and share it. The list can then can be imported into Birdbody to recreate the collection via the "Tweets by ID" feature.
+
+
+It was originally based on the tweet_dumper.py gist by Yanofsky (https://gist.github.com/yanofsky/5436496).
 
 ## Usage notes
 You can easily create your own multi-user corpus in CSV, XML and TXT format using the steps outlined below.
@@ -73,14 +87,7 @@ Twitter does not allow you to distribute the actual text corpus, but you can sha
 ## Windows
 A  Windows (64bit) executable is now available.
 
-Please note that I can not guarantee that the Windows binary will always be up to date, but I will do my best to update it
-whenever something important happens in this repository. 
-
-## Known issues 
-Especially under Windows there are still issues when switching windows (or tabs inside Birdbody) during complex operations. 
-Sometimes waiting will resolve this, but it can also crash the app. Until I know how to fix this I suggest minimal
-interface interactions while downloading/streaming tweets or converting files.
-This seems to occur more frequently with the Windows binary than with the Python script, but I have only anecdotal evidence.
+Please note that I can not guarantee that the Windows binary will always be up to date, but I will do my best to update it with every offical release. 
 
 ## Troubleshooting
 
