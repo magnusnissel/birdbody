@@ -161,14 +161,21 @@ def grab_tweets_for_user(api, screen_name, tweet_limit=0, conn=None):
     #Twitter only allows access to a users most recent 3240 tweets with this method
     user_tweets = []  
     #make initial request for most recent tweets (200 is the maximum allowed count)
-    rl_status = api.rate_limit_status()['resources']['statuses']['/statuses/user_timeline']
-    remaining = int(rl_status['remaining'])
-    if remaining < 1:
-        msg = "Waiting until Twitter rate limit is reset ..."
+    try:
+        rl_status = api.rate_limit_status()['resources']['statuses']['/statuses/user_timeline']
+    except tweepy.error.TweepError as e:
         if conn:
-            conn.send(msg)
+            conn.send(e)
         else:
-            print(msg)
+            print(e)
+    else:
+        remaining = int(rl_status['remaining'])
+        if remaining < 1:
+            msg = "Waiting until Twitter rate limit is reset ..."
+            if conn:
+                conn.send(msg)
+            else:
+                print(msg)
     try:
         new_tweets = api.user_timeline(screen_name = screen_name, count=200)
     except tweepy.error.TweepError as e:
