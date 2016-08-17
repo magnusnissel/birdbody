@@ -27,11 +27,16 @@ class BirdbodyGUI(tk.Frame):
         self.root = root
         self.script_path = os.path.dirname(os.path.realpath(sys.argv[0]))
         self.default_data_path = os.path.join(self.script_path, "user_data")
-        try:
-            os.makedirs(self.default_data_path)
-        except OSError as e:
-            if e.errno != 17:
-                raise()
+
+        # make default user data dirs
+        for d in ["screen_names" , "tweets", "tweet_ids"]:
+            d = os.path.join(self.default_data_path, d)
+            try:
+                os.makedirs(d)
+            except FileExistsError:
+                pass
+
+
         self.config_path = os.path.join(self.default_data_path, "settings.ini")
         self.draw_ui()
         self.check_config()
@@ -483,9 +488,8 @@ class BirdbodyGUI(tk.Frame):
         tdn = os.path.join(udp, "tweet_ids")
         try:
             os.makedirs(tdn)
-        except IOError as e:
-            if e.errno != 17:
-                raise()
+        except FileExistsError:
+            pass
         sel = self.csv_listbox.curselection()
         if len(sel) > 0:
             for ind in sel:
@@ -735,8 +739,7 @@ class BirdbodyGUI(tk.Frame):
             acs = self.access_secret_var.get().strip()
             self.ut_download_button.configure(text="Download tweets", state="disabled")
             self.ut_conn, worker_conn = mp.Pipe(duplex=False)
-            self.ut_worker_proc = mp.Process(target=worker.grab_tweets_from_users, args=(udp, ck, 
-                                                                                         cs, ak, acs,
+            self.ut_worker_proc = mp.Process(target=worker.grab_tweets_from_users, args=(udp, ck, cs,
                                                                                          screen_names,
                                                                                          worker_conn))
             self.ut_worker_proc.start()

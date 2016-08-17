@@ -134,28 +134,30 @@ def grab_tweets_by_ids(data_path, consumer_key, consumer_secret, access_key, acc
             id_tweets_to_csv(data_path, filename, id_tweets, conn)
         
  
-def grab_tweets_from_users(data_path, consumer_key, consumer_secret, access_key, access_secret, 
-                        screen_names, conn=None):
+def grab_tweets_from_users(data_path, consumer_key, consumer_secret, 
+                           screen_names, tweet_limit=0, conn=None):
     # used to be user level authentication, app authentication seems better for this task
     auth = tweepy.AppAuthHandler(consumer_key, consumer_secret)
     api = tweepy.API(auth, wait_on_rate_limit=True, wait_on_rate_limit_notify=True)
     start_time = datetime.datetime.now()
-    for sn in screen_names:
+    for i, sn in enumerate(screen_names):
+        msg = "Getting tweets for user #{}: {} ...".format(i+1, sn)
         if conn:
-            msg = "Getting tweets for {} ...".format(sn)
             conn.send(msg)
-        user_tweets = grab_tweets_for_user(api, sn, conn)
+        else:
+            print(msg)
+        user_tweets = grab_tweets_for_user(api, sn, tweet_limit, conn)
         if HAS_PANDAS:
             pd_user_tweets_to_csv(data_path, user_tweets, sn, conn)
         else:
             user_tweets_to_csv(data_path, user_tweets, sn, conn)
-        msg = "Done with {}!".format(sn)
+        msg = "Done with {}.".format(sn)
         if conn:
             conn.send(msg)
         else:
             print(msg)
 
-def grab_tweets_for_user(api, screen_name, conn=None):
+def grab_tweets_for_user(api, screen_name, tweet_limit=0, conn=None):
     #Twitter only allows access to a users most recent 3240 tweets with this method
     user_tweets = []  
     #make initial request for most recent tweets (200 is the maximum allowed count)
@@ -177,25 +179,36 @@ def grab_tweets_for_user(api, screen_name, conn=None):
     else:
         #save most recent tweets
         user_tweets += new_tweets
-        #save the id of the oldest tweet less one
-        try:
-            oldest = user_tweets[-1].id - 1
-        except IndexError:
-            oldest = None
-        #keep grabbing tweets until there are no tweets left to grab
-        while len(new_tweets) > 0:
-            #all subsequent requests use the max_id parameter to prevent duplicates
-            new_tweets = api.user_timeline(screen_name = screen_name,count=200,
-                                                max_id=oldest)
-            #save most recent tweets
-            user_tweets.extend(new_tweets)
-            #update the id of the oldest tweet less one
-            oldest = user_tweets[-1].id - 1
-            msg = "{} tweets downloaded for {} so far.".format(len(user_tweets), screen_name)
-            if conn:
-                conn.send(msg)
-            else:
-                print(msg)
+        if tweet_limit == 0 or len(user_tweets) < tweet_limit:
+            #save the id of the oldest tweet less one
+            try:
+                oldest = user_tweets[-1].id - 1
+            except IndexError:
+                oldest = None
+            #keep grabbing tweets until there are no tweets left to grab
+            while len(new_tweets) > 0:
+                #all subsequent requests use the max_id parameter to prevent duplicates
+                try:
+                    new_tweets = api.user_timeline(screen_name = screen_name,count=200,
+                                                    max_id=oldest)
+                except tweepy.error.TweepError as e:
+                    if conn:
+                        conn.send(e)
+                    else:
+                        print(e)
+                #save most recent tweets
+                user_tweets.extend(new_tweets)
+                #update the id of the oldest tweet less one
+                oldest = user_tweets[-1].id - 1
+                if tweet_limit > 0 and len(user_tweets) > tweet_limit:
+                    user_tweets = user_tweets[:tweet_limit]
+                msg = "{} tweets downloaded for {} so far.".format(len(user_tweets), screen_name)
+                if conn:
+                    conn.send(msg)
+                else:
+                    print(msg)
+        if tweet_limit > 0 and len(user_tweets) > tweet_limit:
+            user_tweets = user_tweets[:tweet_limit-1]
     return user_tweets
 
 def tweets_to_dict_list(tweets, from_json=False):
