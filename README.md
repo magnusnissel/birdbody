@@ -20,10 +20,37 @@ Twitter does not allow you to share collections of full tweets. With Birdbody it
 
 It was originally based on the tweet_dumper.py gist by Yanofsky (https://gist.github.com/yanofsky/5436496).
 
-## Usage notes
+## Requirements
+  * Python 3
+  * tweepy
+
+A  Windows (64bit) executable is available for each versioned release.
+
+# Citing Birdbody
+
+If you end up using Birdbody for published research, I would appreciate a reference. For version 1.0.2 (codename Albatross) this could look like
+
+
+Nissel, Magnus. 2016. Birdbody 1.0.2 (Albatross). https://github.com/magnusnissel/birdbody
+
+
+Here is a BibTex entry suggestion
+```
+@misc{magnus_nissel_2016_60307,
+  author       = {Magnus Nissel},
+  title        = {Birdbody 1.0.2 (Albatross)},
+  year         = 2016,
+  url          = {https://github.com/magnusnissel/birdbody/releases/tag/v1.0.2}
+}
+```
+
+# License
+GNU General Public License Version 3 (or later). See LICENSE file for more information.
+
+# Using Birdbody
 You can easily create your own multi-user corpus in CSV, XML and TXT format using the steps outlined below.
 
-### Initial setup
+## Initial setup
 In order to use birdbody you need to first create a Twitter app through https://apps.twitter.com.
 This allows you to generate the four credentials required to access the Twitter API:
  
@@ -80,33 +107,45 @@ Twitter does not allow you to distribute the actual text corpus, but you can sha
 3. Click on "Export list of Tweet IDs"
 4. The ID list(s) will appear in the "tweet_ids" folder inside your data folder.
 
-## Requirements
-  * Python 3
-  * tweepy
+### Troubleshooting
 
-## Windows
-A  Windows (64bit) executable is now available.
-
-Please note that I can not guarantee that the Windows binary will always be up to date, but I will do my best to update it with every offical release. 
-
-## Troubleshooting
-
-### 401
+#### 401
 If you receive a 401 error, the most common cause is that your authentication __credentials are incorrect__. However, I have also seen that error 
 while __streaming tweets__ when my computer's __local time was off__. So if "Tweets by users" still works, but streaming doesn't, then check the time settings
 of your operating system.
 
-## 403, 420, 429
+#### 403, 420, 429
 These errors can occur due to __rate limiting__. While Birdbody uses [tweepy's feature to sleep automatically when rate limited](http://docs.tweepy.org/en/v3.2.0/api.html#API) 
 it is still possible to get theses errors because you are requesting too much data from Twitter at too fast a pace. There are a number of ways to avoid this including
 working with several smaller lists of users/keywords instead of a single large one or by limiting the number of tweets gathered. However, in normal situations you simply
 need to wait until you are no longer rate limited and often tweepy/Birdbody will do this automatically for you.
 
-## More information 
+#### More information 
 [Official Twitter error code documentation](https://dev.twitter.com/overview/api/response-codes)
 
-## LICENSE
-GNU General Public License Version 3 (or later). See LICENSE file for more information.
+
+
+## Command Line Interface
+cli.py includes basic command line functionality for downloading tweets by users
+```
+usage: cli.py [-h]
+              [--userfile FILENAME | --userpath PATH | --usernames [LIST [LIST ...]]]
+              [--limit N] [--skip]
+
+Command line interface to download tweets by specified users
+
+optional arguments:
+  -h, --help            show this help message and exit
+  --userfile FILENAME   name of a file inside the user_data/screen_names
+                        folder
+  --userpath PATH       full path to a user list
+  --usernames [LIST [LIST ...]]
+                        a space-separated list of user names
+  --limit N             only save N tweets per user
+  --skip                skip if a user tweet file for this date already exists
+  ```
+
+
 
 ## Changelog
 
@@ -116,20 +155,4 @@ GNU General Public License Version 3 (or later). See LICENSE file for more infor
 - added some 401 error explanations
 - changed structure from package to simple script
 
-# Citing Birdbody
 
-If you end up using Birdbody for published research, I would appreciate a reference. For version 1.0.0 (codename Albatross) this could look like
-
-
-Nissel, Magnus. 2016. Birdbody 1.0.2 (Albatross). https://github.com/magnusnissel/birdbody
-
-
-Here is a BibTex entry suggestion
-```
-@misc{magnus_nissel_2016_60307,
-  author       = {Magnus Nissel},
-  title        = {Birdbody 1.0.2 (Albatross)},
-  year         = 2016,
-  url          = {https://github.com/magnusnissel/birdbody/releases/tag/v1.0.2}
-}
-```
