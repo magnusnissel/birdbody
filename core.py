@@ -35,6 +35,16 @@ class BirdbodyGUI(tk.Frame):
         self.config_path = os.path.join(self.default_data_path, "settings.ini")
         self.draw_ui()
         self.check_config()
+        try:
+            self.root.wm_iconbitmap(default=os.path.join(self.script_path, 'birdbody.ico'))
+        except:
+            try:
+                icon = PhotoImage(file=os.path.join(self.script_path, "assets", 'birdbody_square_logo.png'))
+                self.root.wm_iconphoto(True, icon)
+            except:
+                pass # fail silently since this is ultimately of no consequence
+            
+
         self.root.mainloop()
 
     def draw_ui(self):
@@ -129,9 +139,6 @@ class BirdbodyGUI(tk.Frame):
             search_str_list = search_text.split("\n")
             search_str_list = list(filter(None, search_str_list)) 
             if search_str_list:
-                msg = "Started streaming ..."
-                self.update_status(msg, ts=True)
-                self.st_write_to_log(msg, ts=True)
                 self.start_stream_button.configure(text="Stop streaming")
                 udp = self.data_path_var.get().strip()
                 ck = self.consumer_key_var.get().strip()
@@ -154,17 +161,15 @@ class BirdbodyGUI(tk.Frame):
                                                                                     search_str_list,
                                                                                     max_tweets,
                                                                                     worker_conn))
+                msg = "Started streaming ..."
+                self.update_status(msg, ts=True)
+                self.st_write_to_log(msg, ts=True)
                 self.st_worker_proc.start()
                 self.st_after = self.root.after(1000, self.check_streaming_status)
         else:
-            msg = "Stopping ..."
-            self.update_status(msg, ts=True)
-            self.st_write_to_log(msg, ts=True)
             self.root.after_cancel(self.st_after)
-            self.st_worker_proc.terminate()
-            self.st_worker_proc.join()
             self.finish_streaming()
-
+            
     def convert_any_json_to_csv(self):
         udp = self.data_path_var.get().strip()
         options = {}
@@ -233,16 +238,22 @@ class BirdbodyGUI(tk.Frame):
             self.st_write_to_log(msg, ts=True)
 
     def finish_streaming(self):
-        if self.start_stream_button["text"] != "Start screaming":
+        if self.start_stream_button["text"] != "Start streaming":
             udp = self.data_path_var.get().strip()
             dn = os.path.join(udp, "tweets", "json")
-            msg = "Done streaming tweets.\nRaw JSON saved to \n{}".format(dn)
-            self.file_list_dirty = True
-            self.update_status(msg, ts=True)
-            self.st_write_to_log(msg, ts=True)
-            self.convert_json_to_csv(udp, self.stream_fn)
+            if os.path.exists(os.path.join(dn, "{}.json".format(self.stream_fn))):
+                msg = "Stopped streaming tweets.\nRaw JSON saved to \n{}".format(dn)
+                color = "green"
+                self.file_list_dirty = True
+                self.convert_json_to_csv(udp, self.stream_fn)
+            else:
+                color = "white"
+                msg = "Stopped streaming tweets. No tweets were gathered."
+                self.file_list_dirty = True
             self.start_stream_button.configure(text="Start streaming")
-
+            self.update_status(msg, ts=True, color=color)
+            self.st_write_to_log(msg, ts=True)
+                
 
     def check_streaming_status(self):
         if not self.st_worker_proc.is_alive():
@@ -788,15 +799,14 @@ class BirdbodyGUI(tk.Frame):
                 self.write_to_log(msg, ts=True)
             self.root.after(1000, self.check_ut_download_status)
 
-    def update_status(self, text, ts=False, color=None):
+    def update_status(self, text, ts=False, color="white"):
         if ts:
             now = datetime.datetime.now().isoformat()[:19].replace("T"," ")
             text = "{} ({})".format(text, now)
             if "401" in text:
                 text = "Twitter Error 401: see https://dev.twitter.com/overview/api/response-codes for more information. ({})".format(now)
         self.status_var.set(text)
-        if color:
-            self.status_bar.config(background=color)
+        self.status_bar.config(background=color)
 
     def write_to_log(self, text, ts=False):
         if ts:

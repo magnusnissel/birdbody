@@ -68,9 +68,9 @@ class BirdBodyListener(tweepy.StreamListener):
         if status == 420:  # Rate Limited
             #returning False in on_data disconnects the stream
             if self.conn:
-                self.conn.send("Rate limited reached. Will stop streaming.", ts=True)
+                self.conn.send("Twitter rate limited reached. Please try again in a couple of minutes.")
             else:
-                print("Rate limit reached. Will stop streaming.")
+                print("Twitter rate limit reached. Will wait. Please try again in a couple of minutes.")
             return False
         else:
             if self.conn:
