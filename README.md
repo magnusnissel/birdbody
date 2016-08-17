@@ -1,5 +1,3 @@
-[![DOI](https://zenodo.org/badge/23260/magnusnissel/birdbody.svg)](https://zenodo.org/badge/latestdoi/23260/magnusnissel/birdbody)
-
 # Birdbody
 ![Birdbody logo](https://github.com/magnusnissel/birdbody/blob/master/assets/birdbody_fb_profile.png)
 
@@ -116,16 +114,15 @@ GNU General Public License Version 3 (or later). See LICENSE file for more infor
 If you end up using Birdbody for published research, I would appreciate a reference. For version 1.0.0 (codename Albatross) this could look like
 
 
-Nissel, Magnus. 2016. Birdbody 1.0.0 (Albatross). Zenodo. 10.5281/zenodo.60307
+Nissel, Magnus. 2016. Birdbody 1.0.2 (Albatross). https://github.com/magnusnissel/birdbody
 
 
 Here is a BibTex entry suggestion
 ```
 @misc{magnus_nissel_2016_60307,
   author       = {Magnus Nissel},
-  title        = {Birdbody 1.0.0 (Albatross)},
+  title        = {Birdbody 1.0.2 (Albatross)},
   year         = 2016,
-  doi          = {10.5281/zenodo.60307},
-  url          = {http://dx.doi.org/10.5281/zenodo.60307}
+  url          = {https://github.com/magnusnissel/birdbody/releases/tag/v1.0.2}
 }
 ```
